@@ -78,6 +78,7 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                     # We iterate through the dataframe to prepare dictionary records
                     # Note: normalize_dataframe already handled date and number conversion for some cols
                     
+                    from datetime import datetime
                     for _, row in df_new.iterrows():
                         record = {'source_id': source_id}
                         for csv_col, db_col in column_mapping.items():
@@ -85,6 +86,15 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                                 val = row[csv_col]
                                 if pd.isna(val):
                                     val = None
+                                elif db_col == 'reporting_day' and val:
+                                    # Convert string to date
+                                    val = datetime.strptime(str(val)[:10], '%Y-%m-%d').date()
+                                elif db_col == 'production_no':
+                                    # Ensure integer
+                                    try:
+                                        val = int(float(val)) if val else 0
+                                    except:
+                                        val = 0
                                 record[db_col] = val
                         db_data.append(record)
                     
