@@ -183,7 +183,7 @@ export function TanStackTable<T>({
                         }}
                         align={(header.column.columnDef.meta as { align?: 'left' | 'right' | 'center' })?.align}
                       >
-                        <Box display="flex" alignItems="center" gap={0.5}>
+                        <Box display="flex" alignItems="center" gap={0.5} justifyContent={(header.column.columnDef.meta as { align?: string })?.align === 'right' ? 'flex-end' : (header.column.columnDef.meta as { align?: string })?.align === 'center' ? 'center' : 'flex-start'}>
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {header.column.getIsSorted() === 'asc' && <ArrowUpward sx={{ fontSize: 16 }} />}
                           {header.column.getIsSorted() === 'desc' && <ArrowDownward sx={{ fontSize: 16 }} />}
