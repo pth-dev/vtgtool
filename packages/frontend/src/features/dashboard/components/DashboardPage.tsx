@@ -83,7 +83,7 @@ export default function DashboardPage() {
       const res = await fetch(`/api/dashboard/decomposition?${params}`)
       return res.json()
     },
-    enabled: !!data?.kpis?.total_orders && !!selectedMonth && mode === 'single',
+    enabled: !!selectedMonth && mode === 'single',
   })
 
   // Comparison data (Compare mode)
