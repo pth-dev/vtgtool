@@ -1,0 +1,19 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "printWidth": 100,
+  "plugins": ["@trivago/prettier-plugin-sort-imports"],
+  "importOrder": [
+    "^react(-dom)?$",
+    "^react-router",
+    "^@tanstack/",
+    "^@mui/",
+    "^(@hookform|zod|zustand|animejs|apexcharts|react-apexcharts|react-grid-layout)",
+    "^@/(services|components|features|shared|hooks|stores|constants|types)",
+    "^[./]"
+  ],
+  "importOrderSeparation": true,
+  "importOrderSortSpecifiers": true
+}

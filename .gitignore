@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Build outputs
+dist/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test
+cookies.txt
+load-test.js
+
+# Uploads (keep .gitkeep)
+uploads/*
+!uploads/.gitkeep
+
+# Cache
+.tanstack/
+
+# Secrets - NEVER commit
+*.pem
+*.key
+secrets/
+.env.prod
+.env.uat
