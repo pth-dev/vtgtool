@@ -138,6 +138,15 @@ export function TanStackTable<T>({
     )
   }
 
+  // Guard against empty columns
+  if (columns.length === 0) {
+    return (
+      <Box sx={{ py: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">No columns defined</Typography>
+      </Box>
+    )
+  }
+
   return (
     <Box>
       {/* Header with search and info */}
