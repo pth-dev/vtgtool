@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { Box, Typography } from '@mui/material'
+import { Alert, Box, Typography } from '@mui/material'
 
 import { PaginatedData, api } from '@/services/api'
 import { DataPreviewTable } from '@/shared/components/ui'
@@ -18,6 +18,7 @@ interface Props {
 export function DataPreview({ datasetId, sourceId, title }: Props) {
   const [data, setData] = useState<PaginatedData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(50)
   const [search, setSearch] = useState('')
@@ -25,6 +26,7 @@ export function DataPreview({ datasetId, sourceId, title }: Props) {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
+      setError(null)
       try {
         if (datasetId) {
           const result = await api.getDatasetData(
@@ -47,8 +49,9 @@ export function DataPreview({ datasetId, sourceId, title }: Props) {
             total_pages: 1,
           })
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to load data:', err)
+        setError(err?.response?.data?.detail || err?.message || 'Failed to load data')
       }
       setLoading(false)
     }
@@ -67,6 +70,14 @@ export function DataPreview({ datasetId, sourceId, title }: Props) {
   const handleSearchChange = (newSearch: string) => {
     setSearch(newSearch)
     setPage(0)
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+      </Alert>
+    )
   }
 
   return (
