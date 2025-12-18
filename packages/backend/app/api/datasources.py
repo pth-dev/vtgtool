@@ -295,15 +295,19 @@ async def delete_source(id: int, db: AsyncSession = Depends(get_db), user: User 
         raise HTTPException(404, "Not found")
     
     data_type = source.data_type
+    file_path = source.file_path
     
-    if os.path.exists(source.file_path):
-        os.remove(source.file_path)
+    # Delete dashboard_data FIRST (foreign key constraint)
+    if data_type == "dashboard":
+        await db.execute(delete(DashboardData).where(DashboardData.source_id == id))
+    
+    # Then delete data_source
     await db.delete(source)
     await db.commit()
     
-    # Remove rows from database if it's dashboard data
-    if data_type == "dashboard":
-        await db.execute(delete(DashboardData).where(DashboardData.source_id == id))
+    # Delete file after DB commit
+    if file_path and os.path.exists(file_path):
+        os.remove(file_path)
 
     # Clear dashboard cache
     try:
