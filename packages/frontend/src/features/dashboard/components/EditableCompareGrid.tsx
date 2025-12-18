@@ -143,13 +143,14 @@ export function EditableCompareGrid({ data, isMobile = false }: EditableCompareG
 
   const renderChart = (config: ChartConfig) => {
     const height = isMobile ? 220 : 280
+    const monthlyData = data.monthly_data || []
     switch (config.i) {
       case 'failure_rate':
         return (
           <FailureRateTrend
-            data={data.monthly_data.map((d) => ({
+            data={monthlyData.map((d) => ({
               month: d.month,
-              label: d.label,
+              label: d.label || d.month,
               failure_rate: d.failure_rate,
               total: d.total,
               canceled: 0,
@@ -158,7 +159,7 @@ export function EditableCompareGrid({ data, isMobile = false }: EditableCompareG
           />
         )
       case 'monthly_volume':
-        return <MonthlyVolumeChart data={data.monthly_data} height={height} />
+        return <MonthlyVolumeChart data={monthlyData} height={height} />
       case 'customer_trend':
         return <HeatmapChart data={data.customer_trend || []} height={height} />
       case 'category_trend':
