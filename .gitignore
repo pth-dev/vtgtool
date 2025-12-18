@@ -41,3 +41,4 @@ uploads/*
 secrets/
 .env.prod
 .env.uat
+*.tar
