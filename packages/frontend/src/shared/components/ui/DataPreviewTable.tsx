@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { Chip, Tooltip, Typography } from '@mui/material'
 import { TanStackTable } from './TanStackTable'
-import { ErrorBoundary } from './ErrorBoundary'
 import type { ColumnSchema } from '@/types/api.types'
 
 export type { ColumnSchema }
@@ -77,26 +76,24 @@ export function DataPreviewTable({
   const info = headerInfo || `${totalCount.toLocaleString()} rows • ${columnNames.length} columns`
 
   return (
-    <ErrorBoundary>
-      <TanStackTable
-        data={data}
-        columns={columns}
-        isLoading={isLoading}
-        totalCount={onPageChange ? totalCount : undefined}
-        page={page}
-        pageSize={rowsPerPage}
-        onPageChange={onPageChange}
-        onPageSizeChange={onRowsPerPageChange}
-        showPagination={showPagination}
-        showSearch={showSearch}
-        searchValue={searchValue}
-        onSearchChange={onSearchChange}
-        headerInfo={info}
-        maxHeight={maxHeight}
-        rowsPerPageOptions={rowsPerPageOptions}
-        emptyMessage={emptyMessage}
-        getRowId={(_, i) => String(i)}
-      />
-    </ErrorBoundary>
+    <TanStackTable
+      data={data}
+      columns={columns}
+      isLoading={isLoading}
+      totalCount={onPageChange ? totalCount : undefined}
+      page={page}
+      pageSize={rowsPerPage}
+      onPageChange={onPageChange}
+      onPageSizeChange={onRowsPerPageChange}
+      showPagination={showPagination}
+      showSearch={showSearch}
+      searchValue={searchValue}
+      onSearchChange={onSearchChange}
+      headerInfo={info}
+      maxHeight={maxHeight}
+      rowsPerPageOptions={rowsPerPageOptions}
+      emptyMessage={emptyMessage}
+      getRowId={(_, i) => String(i)}
+    />
   )
 }
