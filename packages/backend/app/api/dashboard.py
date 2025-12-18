@@ -55,7 +55,7 @@ async def get_available_months(db: AsyncSession) -> List[str]:
         .distinct()
         .order_by(desc('month'))
     )
-    return [r.month for r in result.scalars().all() if r]
+    return [r for r in result.scalars().all() if r]
 
 def calc_mom_change(current: dict, prev: dict) -> dict:
     if not prev or not current:
