@@ -48,6 +48,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY}
       - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=${ENVIRONMENT}
     volumes:
       - ../uploads:/app/uploads
     depends_on:
