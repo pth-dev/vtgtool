@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, delete
+from sqlalchemy import select, insert, delete, func
 import os, uuid
 import pandas as pd
 import logging

@@ -9,16 +9,20 @@ logger = logging.getLogger(__name__)
 # Create SSL context for managed PostgreSQL
 def get_ssl_context():
     """Create SSL context based on environment"""
+    ssl_context = ssl.create_default_context()
+    
     if settings.ENVIRONMENT == "development":
-        # Only disable SSL verification in development
+        # Disable SSL verification in development
         logger.warning("SSL certificate verification disabled for development")
-        ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
-        return ssl_context
-    else:
-        # Production: use proper SSL verification
-        return ssl.create_default_context()
+    elif "ondigitalocean.com" in settings.DATABASE_URL:
+        # DigitalOcean managed database - accept self-signed certs
+        logger.info("Using SSL with DigitalOcean managed database")
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+    
+    return ssl_context
 
 # Remove ssl param from URL if present and pass via connect_args
 db_url = settings.DATABASE_URL.replace("?ssl=require", "").replace("&ssl=require", "")

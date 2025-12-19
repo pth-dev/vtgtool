@@ -11,22 +11,6 @@ services:
       timeout: 3s
       retries: 3
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - vtg-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   frontend:
     build:
       context: ../packages/frontend
@@ -54,14 +38,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      db:
-        condition: service_healthy
     networks:
       - vtg-network
 
 networks:
   vtg-network:
     driver: bridge
-
-volumes:
-  postgres_data:
