@@ -5,7 +5,9 @@ from typing import Optional, List
 from app.core.database import get_db
 from app.core.cache import cache_get, cache_set
 from app.models.models import DashboardData
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 def clean_for_json(obj):

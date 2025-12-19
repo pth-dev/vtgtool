@@ -9,9 +9,20 @@ venv/
 dist/
 *.egg-info/
 
-# Environment
+# Environment - NEVER commit these!
 .env
-.env.local
+.env.*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+
+# Specific env ignores
+packages/backend/.env
+packages/backend/.env.*
+!packages/backend/.env.example
+infra/.env
+infra/.env.*
 
 # IDE
 .vscode/
@@ -23,6 +34,8 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+packages/backend/logs/
 
 # Test
 cookies.txt
@@ -30,7 +43,11 @@ load-test.js
 
 # Uploads (keep .gitkeep)
 uploads/*
+uploads_uat/*
 !uploads/.gitkeep
+packages/backend/uploads/*
+packages/backend/uploads_uat/*
+!packages/backend/uploads/.gitkeep
 
 # Cache
 .tanstack/
@@ -39,6 +56,7 @@ uploads/*
 *.pem
 *.key
 secrets/
-.env.prod
-.env.uat
 *.tar
+*.sql
+backup-*.sql
+*.backup

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, delete
 import os, uuid
 import pandas as pd
+import logging
 from app.core.database import get_db, async_session
 from app.core.config import settings
 from app.core.cache import cache_delete
@@ -11,6 +12,7 @@ from app.api.auth import get_current_user
 from app.schemas.schemas import DataSourceResponse
 from app.services.data_processor import FileParser, SchemaDetector, DataValidator
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -74,12 +76,14 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                     }
 
                     # Prepare data for insertion
+                    # FIX: Use vectorized operations instead of slow iterrows()
                     db_data = []
-                    # We iterate through the dataframe to prepare dictionary records
-                    # Note: normalize_dataframe already handled date and number conversion for some cols
                     
                     from datetime import datetime
-                    for _, row in df_new.iterrows():
+                    # Convert entire DataFrame to dict records at once (much faster)
+                    records = df_new.to_dict('records')
+                    
+                    for row in records:
                         record = {'source_id': source_id}
                         for csv_col, db_col in column_mapping.items():
                             if csv_col in row:
@@ -88,12 +92,15 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                                     val = None
                                 elif db_col == 'reporting_day' and val:
                                     # Convert string to date
-                                    val = datetime.strptime(str(val)[:10], '%Y-%m-%d').date()
+                                    try:
+                                        val = datetime.strptime(str(val)[:10], '%Y-%m-%d').date()
+                                    except (ValueError, TypeError):
+                                        val = None
                                 elif db_col == 'production_no':
                                     # Ensure integer
                                     try:
                                         val = int(float(val)) if val else 0
-                                    except:
+                                    except (ValueError, TypeError):
                                         val = 0
                                 record[db_col] = val
                         db_data.append(record)
@@ -103,34 +110,49 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                         chunk_size = 1000
                         for i in range(0, len(db_data), chunk_size):
                             await db.execute(insert(DashboardData), db_data[i:i + chunk_size])
+                        
+                        # Commit after all chunks
+                        await db.commit()
+                        logger.info(f"Successfully inserted {len(db_data)} records for source {source_id}")
 
                 # ---------------------------------------------
                 
                 schema = SchemaDetector.detect_schema(df_new)
                 validation = DataValidator.validate(df_new)
                 
-                # Update source info
+                # Update source info - wrapped in transaction
                 source.row_count = validation["row_count"]
                 source.column_count = validation["column_count"]
                 source.columns_meta = schema
                 source.status = "ready"
+                await db.commit()
+                logger.info(f"Source {source_id} processed successfully: {source.row_count} rows")
                 
                 # Clear dashboard cache
                 try:
                     await cache_delete("dashboard:*")
-                except:
-                    pass
+                except Exception as cache_err:
+                    logger.warning(f"Failed to clear cache: {cache_err}")
                     
             except Exception as e:
+                logger.error(f"Error processing file for source {source_id}: {e}", exc_info=True)
+                # Rollback transaction on error
+                await db.rollback()
                 source.status = "error"
                 source.error_message = str(e)
-                # Should we delete the file? Maybe keep it for debugging
-            
-            await db.commit()
+                await db.commit()
+                
+                # Clean up file on error
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        logger.info(f"Cleaned up file after error: {file_path}")
+                    except OSError as rm_err:
+                        logger.warning(f"Failed to remove file {file_path}: {rm_err}")
             
         except Exception as e:
             # Fatal error
-            print(f"Error in background upload task: {e}")
+            logger.error(f"Fatal error in background upload task for source {source_id}: {e}", exc_info=True)
 
 @router.post("/upload", response_model=DataSourceResponse)
 async def upload(
@@ -175,16 +197,16 @@ async def list_sources(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    # Build base query
     query = select(DataSource).where(DataSource.user_id == user.id)
     if search:
         query = query.where(DataSource.name.ilike(f"%{search}%"))
     
-    count_result = await db.execute(query)
-    total = len(count_result.scalars().all())
+    # Fix N+1: Use proper COUNT query instead of loading all records
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await db.scalar(count_query) or 0
     
-    query = select(DataSource).where(DataSource.user_id == user.id)
-    if search:
-        query = query.where(DataSource.name.ilike(f"%{search}%"))
+    # Fetch paginated data
     query = query.order_by(DataSource.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     sources = result.scalars().all()

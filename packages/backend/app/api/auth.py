@@ -37,14 +37,17 @@ async def login(data: LoginRequest, response: Response, db: AsyncSession = Depen
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token({"sub": str(user.id)})
     
-    # Set HTTP-Only cookie
+    # Set HTTP-Only cookie with environment-aware security
+    from app.core.config import settings
+    is_production = settings.ENVIRONMENT == "production"
+    
     response.set_cookie(
         key="auth_token",
         value=token,
         httponly=True,
-        secure=True,
-        samesite="strict",
-        max_age=24 * 60 * 60  # 24 hours
+        secure=is_production,  # Only require HTTPS in production
+        samesite="strict" if is_production else "lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     
     return {"message": "Login successful"}

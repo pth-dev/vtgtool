@@ -18,7 +18,7 @@ class FileParser:
                 if enc:
                     try:
                         return pd.read_csv(file_path, encoding=enc)
-                    except:
+                    except (UnicodeDecodeError, pd.errors.ParserError):
                         continue
             return pd.read_csv(file_path)
         elif ext in ['.xlsx', '.xls']:
@@ -69,7 +69,7 @@ class SchemaDetector:
         try:
             pd.to_numeric(non_null)
             return "number"
-        except:
+        except (ValueError, TypeError):
             pass
         
         # Check date
@@ -82,7 +82,7 @@ class SchemaDetector:
         try:
             pd.to_datetime(sample, errors='raise')
             return "date"
-        except:
+        except (ValueError, pd.errors.ParserError):
             pass
         
         return "string"
