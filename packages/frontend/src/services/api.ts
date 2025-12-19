@@ -48,8 +48,8 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const errorText = await res.text()
     const parsed = parseApiError(errorText)
     
-    // Auto logout on 401
-    if (res.status === 401) {
+    // Auto logout on 401, but skip redirect if already on login page or if this is the login endpoint
+    if (res.status === 401 && !endpoint.includes('/auth/login') && window.location.pathname !== '/login') {
       useAuthStore.getState().logout()
       window.location.href = '/login'
     }
