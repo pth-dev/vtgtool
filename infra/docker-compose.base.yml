@@ -1,0 +1,45 @@
+# =============================================
+# BASE COMPOSE - Shared service definitions
+# =============================================
+# Không dùng trực tiếp, extend từ các file khác
+
+x-backend-common: &backend-common
+  build:
+    context: ../packages/backend
+    dockerfile: Dockerfile
+  environment: &backend-env
+    - DATABASE_URL=${DATABASE_URL}
+    - SECRET_KEY=${SECRET_KEY}
+    - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    - ENVIRONMENT=${ENVIRONMENT:-development}
+    - UPLOAD_DIR=${UPLOAD_DIR:-uploads}
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+
+x-frontend-common: &frontend-common
+  build:
+    context: ../packages/frontend
+    dockerfile: Dockerfile
+  depends_on:
+    backend:
+      condition: service_healthy
+
+x-redis-common: &redis-common
+  image: redis:7-alpine
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 3
+
+x-postgres-common: &postgres-common
+  image: postgres:15-alpine
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+    interval: 5s
+    timeout: 3s
+    retries: 3

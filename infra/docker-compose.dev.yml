@@ -1,0 +1,54 @@
+# =============================================
+# DEV ENVIRONMENT - Database & Services Only
+# =============================================
+# Chỉ chạy DB + Redis trong Docker
+# Backend/Frontend chạy NATIVE (localhost) cho hot reload nhanh nhất!
+#
+# Usage: 
+#   1. docker compose -f docker-compose.dev.yml up -d
+#   2. cd packages/backend && uvicorn main:app --reload
+#   3. cd packages/frontend && npm run dev
+
+services:
+  # PostgreSQL for Development
+  db:
+    image: postgres:15-alpine
+    container_name: vtg-db-dev
+    environment:
+      POSTGRES_USER: vtg_dev
+      POSTGRES_PASSWORD: dev_password_123
+      POSTGRES_DB: vtgtool_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+      - ../packages/backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vtg_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Redis for Development
+  redis:
+    image: redis:7-alpine
+    container_name: vtg-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Adminer - Database GUI (http://localhost:8081)
+  adminer:
+    image: adminer:latest
+    container_name: vtg-adminer-dev
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
+volumes:
+  pgdata_dev:
