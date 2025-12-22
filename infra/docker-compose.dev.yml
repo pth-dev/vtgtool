@@ -5,7 +5,7 @@
 # Backend/Frontend chạy NATIVE (localhost) cho hot reload nhanh nhất!
 #
 # Usage: 
-#   1. docker compose -f docker-compose.dev.yml up -d
+#   1. docker compose -f docker-compose.dev.yml --env-file envs/.env.dev up -d
 #   2. cd packages/backend && uvicorn main:app --reload
 #   3. cd packages/frontend && npm run dev
 
@@ -15,11 +15,11 @@ services:
     image: postgres:15-alpine
     container_name: vtg-db-dev
     environment:
-      POSTGRES_USER: vtg_dev
-      POSTGRES_PASSWORD: dev_password_123
-      POSTGRES_DB: vtgtool_dev
+      POSTGRES_USER: ${DB_USER:-vtg_dev}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password_123}
+      POSTGRES_DB: ${DB_NAME:-vtgtool_dev}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
       - ../packages/backend/migrations:/docker-entrypoint-initdb.d:ro
@@ -34,7 +34,7 @@ services:
     image: redis:7-alpine
     container_name: vtg-redis-dev
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

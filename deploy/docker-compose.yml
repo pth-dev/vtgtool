@@ -1,0 +1,90 @@
+# =============================================
+# VTG TOOL - Production/UAT Deployment
+# =============================================
+# File này được copy lên server production/uat
+# KHÔNG build image, chỉ PULL từ Docker Registry
+#
+# Usage:
+#   docker compose up -d              # Start all services
+#   docker compose pull               # Pull latest images
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop all services
+
+services:
+  # ===========================================
+  # REDIS CACHE
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: vtg-redis
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - vtg-network
+
+  # ===========================================
+  # BACKEND API
+  # ===========================================
+  backend:
+    image: ${DOCKERHUB_USERNAME}/vtgtool-be:${IMAGE_TAG:-latest}
+    container_name: vtg-backend
+    restart: always
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vtg-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================
+  # FRONTEND (NGINX)
+  # ===========================================
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/vtgtool-fe:${IMAGE_TAG:-latest}
+    container_name: vtg-frontend
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_SSL_PORT:-443}:443"
+    volumes:
+      # Mount SSL certificates từ host
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Mount nginx config tùy theo môi trường
+      - ./nginx/${NGINX_CONFIG:-prod.conf}:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vtg-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+networks:
+  vtg-network:
+    driver: bridge
+
+volumes:
+  uploads:
