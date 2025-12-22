@@ -283,11 +283,11 @@ FRONTEND_SSL_PORT=443
 # Nginx config file
 NGINX_CONFIG=prod.conf
 
-# Database (DigitalOcean Managed DB)
-DATABASE_URL=postgresql+asyncpg://doadmin:YOUR_DB_PASSWORD@YOUR_DB_HOST:25060/defaultdb?sslmode=require
+# Database (DigitalOcean Managed DB) - Thay YOUR_PASSWORD bằng password thật
+DATABASE_URL=postgresql+asyncpg://doadmin:YOUR_PASSWORD@YOUR_DB_HOST:25060/defaultdb
 
 # Security - Generate với: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-SECRET_KEY=CHANGE_ME_TO_SECURE_RANDOM_STRING
+SECRET_KEY=GcZqRm2pD8gBqdSoDwZi_ulKS5Ts5FHZE59fFbPuEkY
 EOF
 
 # Sửa file với giá trị thực

@@ -24,11 +24,16 @@ def get_ssl_context():
     
     return ssl_context
 
-# Remove ssl param from URL if present and pass via connect_args
-db_url = settings.DATABASE_URL.replace("?ssl=require", "").replace("&ssl=require", "")
+# Remove ssl/sslmode param from URL if present and pass via connect_args
+db_url = settings.DATABASE_URL
+# Handle both sslmode and ssl parameters
+for param in ["?sslmode=require", "&sslmode=require", "?ssl=require", "&ssl=require"]:
+    db_url = db_url.replace(param, "")
+# Clean up any trailing ? if params were removed
+db_url = db_url.rstrip("?")
 
 # Determine if we need SSL (only for managed databases like DigitalOcean)
-needs_ssl = "ondigitalocean.com" in settings.DATABASE_URL
+needs_ssl = "ondigitalocean.com" in settings.DATABASE_URL or "sslmode" in settings.DATABASE_URL or "ssl=require" in settings.DATABASE_URL
 
 engine = create_async_engine(
     db_url,
