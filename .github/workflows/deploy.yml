@@ -4,9 +4,9 @@
 # Workflow: Build → Push to Registry → Deploy to Server
 #
 # Branches:
-#   - main    → Build + Deploy to PRODUCTION
-#   - develop → Build + Deploy to UAT
-#   - PR      → Build only (test)
+#   - main → Build + Deploy to PRODUCTION
+#   - uat  → Build + Deploy to UAT
+#   - PR   → Build only (test)
 #
 # Server chỉ PULL images, không build, không có source code
 
@@ -14,9 +14,9 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, uat]
   pull_request:
-    branches: [main, develop]
+    branches: [main, uat]
 
 env:
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-be
@@ -52,7 +52,7 @@ jobs:
             echo "tag=latest" >> $GITHUB_OUTPUT
             echo "env=production" >> $GITHUB_OUTPUT
           else
-            echo "tag=develop" >> $GITHUB_OUTPUT
+            echo "tag=uat" >> $GITHUB_OUTPUT
             echo "env=staging" >> $GITHUB_OUTPUT
           fi
           echo "sha=$SHA_SHORT" >> $GITHUB_OUTPUT
@@ -91,13 +91,13 @@ jobs:
       env: ${{ steps.tags.outputs.env }}
 
   # ============================================
-  # JOB 2: Deploy to UAT (develop branch)
+  # JOB 2: Deploy to UAT (uat branch)
   # ============================================
   deploy-uat:
     name: 🚀 Deploy to UAT
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/uat' && github.event_name == 'push'
     environment: uat
     
     steps:
