@@ -1,0 +1,40 @@
+# =============================================
+# UAT ENVIRONMENT - Extends base deployment
+# =============================================
+# Includes local PostgreSQL for UAT testing
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d
+
+services:
+  # ===========================================
+  # PostgreSQL for UAT (local container)
+  # ===========================================
+  db:
+    image: postgres:15-alpine
+    container_name: vtg-db-uat
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-vtg_uat}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-uat_password}
+      POSTGRES_DB: ${DB_NAME:-vtgtool_uat}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vtg_uat}"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - vtg-network
+
+  # Override backend to depend on local db
+  backend:
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

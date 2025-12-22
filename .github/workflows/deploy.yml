@@ -1,65 +1,163 @@
-name: Deploy Application
+# =============================================
+# VTG TOOL - CI/CD Pipeline (Chuẩn Industry)
+# =============================================
+# Workflow: Build → Push to Registry → Deploy to Server
+#
+# Branches:
+#   - main    → Build + Deploy to PRODUCTION
+#   - develop → Build + Deploy to UAT
+#   - PR      → Build only (test)
+#
+# Server chỉ PULL images, không build, không có source code
+
+name: Build & Deploy
 
 on:
   push:
-    branches:
-      - main
-      - uat
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-be
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-fe
 
 jobs:
-  deploy:
+  # ============================================
+  # JOB 1: Build and Push Docker Images
+  # ============================================
+  build:
+    name: 🔨 Build & Push Images
     runs-on: ubuntu-latest
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'uat' }}
-
+    
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Determine Environment and Tags
-      id: vars
-      run: |
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          echo "env_file=.env.prod" >> $GITHUB_OUTPUT
-          echo "fe_tag=latest" >> $GITHUB_OUTPUT
-          echo "be_tag=latest" >> $GITHUB_OUTPUT
-        else
-          echo "env_file=.env.uat" >> $GITHUB_OUTPUT
-          echo "fe_tag=uat-v1" >> $GITHUB_OUTPUT
-          echo "be_tag=uat-v1" >> $GITHUB_OUTPUT
-        fi
+      - name: Determine tags
+        id: tags
+        run: |
+          SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-7)
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          else
+            echo "tag=develop" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          fi
+          echo "sha=$SHA_SHORT" >> $GITHUB_OUTPUT
 
-    - name: Build and Push Frontend Image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./packages/frontend
-        push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-fe:${{ steps.vars.outputs.fe_tag }}
+      # Build Backend
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/backend
+          file: ./packages/backend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.tags.outputs.sha }}
+            ${{ env.BACKEND_IMAGE }}:${{ steps.tags.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Build and Push Backend Image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./packages/backend
-        push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-be:${{ steps.vars.outputs.be_tag }}
+      # Build Frontend
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/frontend
+          file: ./packages/frontend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.tags.outputs.sha }}
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.tags.outputs.tag }}
+          build-args: |
+            VITE_API_URL=/api
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Deploy to Server
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.DO_HOST }}
-        username: ${{ secrets.DO_USERNAME }}
-        key: ${{ secrets.DO_SSH_KEY }}
-        script: |
-          cd /root/vtgtool
-          echo "${{ secrets.ENV_FILE }}" > ${{ steps.vars.outputs.env_file }}
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-fe:${{ steps.vars.outputs.fe_tag }}
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/vtgtool-be:${{ steps.vars.outputs.be_tag }}
-          docker compose --env-file ${{ steps.vars.outputs.env_file }} -f infra/docker-compose.yml up -d --no-deps
-          docker image prune -f
+    outputs:
+      sha: ${{ steps.tags.outputs.sha }}
+      tag: ${{ steps.tags.outputs.tag }}
+      env: ${{ steps.tags.outputs.env }}
+
+  # ============================================
+  # JOB 2: Deploy to UAT (develop branch)
+  # ============================================
+  deploy-uat:
+    name: 🚀 Deploy to UAT
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: uat
+    
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+        with:
+          host: ${{ secrets.UAT_SSH_HOST }}
+          username: root
+          key: ${{ secrets.UAT_SSH_KEY }}
+          envs: IMAGE_TAG,BACKEND_IMAGE,FRONTEND_IMAGE
+          script: |
+            cd /opt/vtgtool
+            
+            # Update image tag
+            sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|g" .env
+            
+            # Pull and restart
+            docker compose pull
+            docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d
+            docker image prune -f
+            
+            echo "✅ UAT deployed: $IMAGE_TAG"
+
+  # ============================================
+  # JOB 3: Deploy to Production (main branch)
+  # ============================================
+  deploy-prod:
+    name: 🚀 Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: root
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: IMAGE_TAG,BACKEND_IMAGE,FRONTEND_IMAGE
+          script: |
+            cd /opt/vtgtool
+            
+            # Update image tag
+            sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|g" .env
+            
+            # Pull and restart (zero-downtime)
+            docker compose pull
+            docker compose up -d --no-deps backend
+            sleep 5
+            docker compose up -d --no-deps frontend
+            docker image prune -f
+            
+            echo "✅ Production deployed: $IMAGE_TAG"
