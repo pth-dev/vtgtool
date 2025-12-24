@@ -2,6 +2,7 @@
 # UAT ENVIRONMENT - Extends base deployment
 # =============================================
 # Includes local PostgreSQL for UAT testing
+# UAT uses its own database container, NOT production DB
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d
@@ -15,23 +16,24 @@ services:
     container_name: vtg-db-uat
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-vtg_uat}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-uat_password}
-      POSTGRES_DB: ${DB_NAME:-vtgtool_uat}
+      POSTGRES_USER: vtg_uat
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-uat_secure_password_2024}
+      POSTGRES_DB: vtgtool_uat
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata-uat:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vtg_uat}"]
+      test: ["CMD-SHELL", "pg_isready -U vtg_uat"]
       interval: 5s
       timeout: 3s
       retries: 3
     networks:
       - vtg-network
 
-  # Override backend to use local UAT database
+  # Override backend to use local UAT database (NOT production!)
   backend:
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-vtg_uat}:${DB_PASSWORD:-uat_password}@db:5432/${DB_NAME:-vtgtool_uat}
+      # Force use local DB container - this overrides any DATABASE_URL in .env
+      - DATABASE_URL=postgresql+asyncpg://vtg_uat:${DB_PASSWORD:-uat_secure_password_2024}@db:5432/vtgtool_uat
       - ENVIRONMENT=uat
     depends_on:
       db:
@@ -40,4 +42,5 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  pgdata-uat:
+    name: vtg-pgdata-uat
