@@ -144,9 +144,10 @@ curl http://localhost/api/health
 ```
 
 ## 🔐 Security Checklist
-
-- [ ] Change SECRET_KEY in .env
+nge SECRET_KEY in .env                                                                                                                                                          
 - [ ] Setup SSL certificates
 - [ ] Configure firewall (allow only 80, 443, 22)
 - [ ] Restrict database access
 - [ ] Enable Docker auto-updates
+
+- [ ] Cha

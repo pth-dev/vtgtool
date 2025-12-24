@@ -28,8 +28,11 @@ services:
     networks:
       - vtg-network
 
-  # Override backend to depend on local db
+  # Override backend to use local UAT database
   backend:
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-vtg_uat}:${DB_PASSWORD:-uat_password}@db:5432/${DB_NAME:-vtgtool_uat}
+      - ENVIRONMENT=uat
     depends_on:
       db:
         condition: service_healthy
