@@ -4,6 +4,7 @@ from sqlalchemy import select, insert, delete, func
 import os, uuid
 import pandas as pd
 import logging
+import magic
 from app.core.database import get_db, async_session
 from app.core.config import settings
 from app.core.cache import cache_delete
@@ -162,16 +163,35 @@ async def upload(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    # Check file extension
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ['.csv', '.xlsx', '.xls', '.json']:
-        raise HTTPException(400, "Unsupported file type")
-    
+        raise HTTPException(400, "Unsupported file extension")
+
+    # Read file content
+    content = await file.read()
+
+    # SECURITY: Validate MIME type
+    mime = magic.from_buffer(content, mime=True)
+
+    # Define allowed MIME types per extension
+    allowed_mimes = {
+        '.csv': ['text/csv', 'text/plain', 'application/csv'],
+        '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        '.xls': ['application/vnd.ms-excel'],
+        '.json': ['application/json', 'text/plain'],
+    }
+
+    # Validate MIME type matches extension
+    if mime not in allowed_mimes.get(ext, []):
+        logger.warning(f"MIME type mismatch: file={file.filename}, ext={ext}, mime={mime}")
+        raise HTTPException(400, f"Invalid file type. Expected {ext} but got {mime}")
+
     # Save uploaded file temporarily
     filename = f"{uuid.uuid4()}{ext}"
     filepath = os.path.join(settings.UPLOAD_DIR, filename)
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    
-    content = await file.read()
+
     with open(filepath, "wb") as f:
         f.write(content)
     
