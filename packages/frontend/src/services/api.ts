@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '@/constants'
 import { useAuthStore } from '@/features/auth'
 import { parseApiError } from '@/shared/utils/error-parser'
+import { sanitizeObject } from '@/shared/validation/api-schemas'
 import type {
   Chart,
   ChartDataPoint,
@@ -34,6 +35,9 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * SECURITY: Enhanced request function with response sanitization
+ */
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -47,17 +51,24 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   if (!res.ok) {
     const errorText = await res.text()
     const parsed = parseApiError(errorText)
-    
+
     // Auto logout on 401, but skip redirect if already on login page or if this is the login endpoint
     if (res.status === 401 && !endpoint.includes('/auth/login') && window.location.pathname !== '/login') {
       useAuthStore.getState().logout()
       window.location.href = '/login'
     }
-    
+
     throw new ApiError(parsed.message, res.status, parsed.fieldErrors, parsed.isValidationError)
   }
 
-  return res.json()
+  const data = await res.json()
+
+  // SECURITY: Sanitize response to prevent prototype pollution
+  if (typeof data === 'object' && data !== null) {
+    return sanitizeObject(data) as T
+  }
+
+  return data
 }
 
 export const api = {

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import App from './App'
 import { ThemeProvider } from './theme'
+import { ErrorBoundary } from './shared/components/ui/ErrorBoundary'
 
 import '@fontsource/roboto/300.css'
 import '@fontsource/roboto/400.css'
@@ -24,17 +25,21 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      // PERFORMANCE: Stale time to reduce unnecessary refetches
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>
 )
 

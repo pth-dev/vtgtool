@@ -1,6 +1,5 @@
 import { TanStackRouterVite } from '@tanstack/router-vite-plugin'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
@@ -13,22 +12,37 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': '/src',
     },
   },
   build: {
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core dependencies
           'vendor-react': ['react', 'react-dom'],
-          'vendor-mui': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          'vendor-charts': ['apexcharts', 'react-apexcharts'],
           'vendor-router': ['@tanstack/react-router', '@tanstack/react-query'],
-          'vendor-utils': ['zustand', 'zod'],
+          'vendor-utils': ['zustand', 'zod', 'react-hook-form', '@hookform/resolvers'],
+
+          // UI libraries (split for better caching)
+          'vendor-mui-core': ['@mui/material', '@emotion/react', '@emotion/styled'],
+          'vendor-mui-icons': ['@mui/icons-material'],
+
+          // Heavy chart libraries (lazy loaded, separate chunks)
+          'vendor-apexcharts': ['apexcharts', 'react-apexcharts'],
+          'vendor-echarts': ['echarts', 'echarts-for-react'],
+
+          // Other heavy dependencies
+          'vendor-table': ['@tanstack/react-table'],
+          'vendor-grid': ['react-grid-layout'],
+          'vendor-xlsx': ['xlsx'],
         },
       },
     },
-    chunkSizeWarningLimit: 600,
+    // Increase limit but warn on very large chunks
+    chunkSizeWarningLimit: 500,
+    // Use esbuild minification (faster, less memory intensive than terser)
+    minify: 'esbuild',
   },
   server: {
     port: 5173,
