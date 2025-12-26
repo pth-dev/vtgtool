@@ -104,7 +104,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
-          IMAGE_TAG: ${{ needs.build.outputs.sha }}
+          IMAGE_TAG: uat
           BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
           FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
         with:
@@ -115,7 +115,7 @@ jobs:
           script: |
             cd /opt/vtgtool
 
-            # Update image tag
+            # Update image tag to 'uat'
             sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|g" .env
 
             # Pull and restart (use docker-compose for compatibility)
@@ -123,7 +123,7 @@ jobs:
             docker-compose -f docker-compose.yml -f docker-compose.uat.yml up -d --remove-orphans
             docker image prune -f
 
-            echo "✅ UAT deployed: $IMAGE_TAG"
+            echo "✅ UAT deployed with tag: $IMAGE_TAG"
 
   # ============================================
   # JOB 3: Deploy to Production (main branch)
@@ -139,7 +139,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
-          IMAGE_TAG: ${{ needs.build.outputs.sha }}
+          IMAGE_TAG: latest
           BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
           FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
         with:
@@ -150,7 +150,7 @@ jobs:
           script: |
             cd /opt/vtgtool
 
-            # Update image tag
+            # Update image tag to 'latest'
             sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|g" .env
 
             # Pull and restart (zero-downtime, use docker-compose for compatibility)
@@ -160,4 +160,4 @@ jobs:
             docker-compose up -d --no-deps frontend
             docker image prune -f
 
-            echo "✅ Production deployed: $IMAGE_TAG"
+            echo "✅ Production deployed with tag: $IMAGE_TAG"
