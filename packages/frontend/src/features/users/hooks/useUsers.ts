@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/services/api'
-import { getUserFriendlyMessage } from '@/shared/utils/error-parser'
+import { parseApiError, type ParsedError } from '@/shared/utils/error-parser'
 
 export function useUsers() {
   const queryClient = useQueryClient()
@@ -19,13 +19,17 @@ export function useUsers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   })
 
+  const parsedError: ParsedError | null = createMutation.error
+    ? parseApiError(createMutation.error)
+    : null
+
   return {
     users: query.data ?? [],
     isLoading: query.isLoading,
     createUser: createMutation.mutate,
     deleteUser: deleteMutation.mutate,
     isCreating: createMutation.isPending,
-    createError: createMutation.error ? getUserFriendlyMessage(createMutation.error) : null,
+    createError: parsedError,
     resetCreateError: createMutation.reset,
   }
 }

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { Add, Delete } from '@mui/icons-material'
+import { Add, Delete, Info } from '@mui/icons-material'
 import {
   Alert,
   Box,
@@ -12,8 +12,11 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
   Paper,
   TextField,
+  Tooltip,
+  Typography,
 } from '@mui/material'
 import { PageHeader } from '@/shared/components/ui'
 import { TanStackTable } from '@/shared/components/ui/TanStackTable'
@@ -70,6 +73,23 @@ export default function UsersPage() {
     })
   }
 
+  // Get field-specific error from API response
+  const getApiFieldError = (field: string): string | undefined => {
+    return createError?.fieldErrors?.[field]
+  }
+
+  // Combine client and server validation errors
+  const getFieldError = (field: 'email' | 'password' | 'full_name') => {
+    return errors[field]?.message || getApiFieldError(field)
+  }
+
+  const hasFieldError = (field: 'email' | 'password' | 'full_name') => {
+    return !!errors[field] || !!getApiFieldError(field)
+  }
+
+  // Only show general error if it's not a field-specific validation error
+  const showGeneralError = createError && !createError.isValidationError
+
   return (
     <Box p={3}>
       <PageHeader
@@ -90,14 +110,68 @@ export default function UsersPage() {
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogTitle>Add New Admin</DialogTitle>
           <DialogContent>
-            {createError && <Alert severity="error" sx={{ mb: 2 }}>{createError}</Alert>}
-            <TextField {...register('email')} fullWidth label="Email" margin="normal" error={!!errors.email} helperText={errors.email?.message} autoFocus />
-            <TextField {...register('password')} fullWidth label="Password" type="password" margin="normal" error={!!errors.password} helperText={errors.password?.message} />
-            <TextField {...register('full_name')} fullWidth label="Full Name" margin="normal" error={!!errors.full_name} helperText={errors.full_name?.message} />
+            {showGeneralError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {createError.message}
+              </Alert>
+            )}
+
+            <TextField
+              {...register('email')}
+              fullWidth
+              label="Email"
+              placeholder="user@example.com"
+              margin="normal"
+              error={hasFieldError('email')}
+              helperText={getFieldError('email')}
+              autoFocus
+            />
+
+            <TextField
+              {...register('password')}
+              fullWidth
+              label="Password"
+              type="password"
+              margin="normal"
+              error={hasFieldError('password')}
+              helperText={getFieldError('password') || 'At least 8 chars, uppercase, lowercase, number'}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Tooltip
+                      title={
+                        <Typography variant="body2">
+                          Password requirements:<br/>
+                          • At least 8 characters<br/>
+                          • One uppercase letter (A-Z)<br/>
+                          • One lowercase letter (a-z)<br/>
+                          • One number (0-9)
+                        </Typography>
+                      }
+                      arrow
+                    >
+                      <Info sx={{ color: 'action.active', cursor: 'help' }} fontSize="small" />
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <TextField
+              {...register('full_name')}
+              fullWidth
+              label="Full Name"
+              placeholder="John Doe"
+              margin="normal"
+              error={hasFieldError('full_name')}
+              helperText={getFieldError('full_name')}
+            />
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button onClick={handleClose} disabled={isCreating}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={isCreating}>{isCreating ? 'Creating...' : 'Create'}</Button>
+            <Button type="submit" variant="contained" disabled={isCreating}>
+              {isCreating ? 'Creating...' : 'Create'}
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
