@@ -122,15 +122,27 @@ export function sanitizeHtml(html: string): string {
 /**
  * Sanitize object by removing potentially dangerous fields
  */
-export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
-  const sanitized = { ...obj }
-  
-  // Remove common XSS vectors
-  const dangerousKeys = ['__proto__', 'constructor', 'prototype']
-  dangerousKeys.forEach(key => {
-    delete sanitized[key]
-  })
-  
-  return sanitized
+export function sanitizeObject<T>(obj: T): T {
+  // Handle arrays - sanitize each element
+  if (Array.isArray(obj)) {
+    return obj.map(item =>
+      typeof item === 'object' && item !== null ? sanitizeObject(item) : item
+    ) as T
+  }
+
+  // Handle objects
+  if (typeof obj === 'object' && obj !== null) {
+    const sanitized = { ...obj } as Record<string, unknown>
+
+    // Remove common XSS vectors
+    const dangerousKeys = ['__proto__', 'constructor', 'prototype']
+    dangerousKeys.forEach(key => {
+      delete sanitized[key]
+    })
+
+    return sanitized as T
+  }
+
+  return obj
 }
 
