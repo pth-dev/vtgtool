@@ -1,153 +1,154 @@
-# 🚀 VTG Tool - Deployment Guide
+# 🚀 VTG Tool - Production Deployment Guide
 
 ## 📋 Overview
 
-This folder contains everything needed to deploy VTG Tool on a production/UAT server.
-**No source code cloning required** - only Docker images from registry.
+Deploy VTG Tool Production lên server riêng.
+
+**UAT Server:** uat.vtgtool.help (139.59.237.190) - Đã setup sẵn
+**Production Server:** vtgtool.help (cần setup)
 
 ## 📁 Structure
 
 ```
 deploy/
-├── docker-compose.yml      # Main deployment file (uses images from registry)
-├── docker-compose.uat.yml  # UAT override (adds local PostgreSQL)
+├── docker-compose.yml      # Production deployment
+├── deploy.sh               # Deploy script
 ├── .env.example            # Environment template
 ├── nginx/
-│   ├── prod.conf           # Production nginx config (vtgtool.help)
-│   └── uat.conf            # UAT nginx config (uat.vtgtool.help)
+│   ├── prod.conf           # Production nginx (vtgtool.help)
+│   └── uat.conf            # UAT nginx (uat.vtgtool.help)
 └── README.md               # This file
 ```
 
-## 🛠️ Server Setup
+## 🛠️ Production Server Setup
 
-### 1. Prerequisites
+### 1. SSH vào Production Server
 
 ```bash
-# Install Docker
+ssh root@<production-server-ip>
+```
+
+### 2. Install Docker
+
+```bash
 curl -fsSL https://get.docker.com | sh
-
-# Install Docker Compose plugin
-apt-get update && apt-get install -y docker-compose-plugin
+apt-get update && apt-get install -y docker-compose certbot git
 ```
 
-### 2. Create deployment directory
+### 3. Clone Repository
 
 ```bash
-mkdir -p /opt/vtgtool
+git clone https://github.com/<org>/vtgtool.git /root/vtgtool
+```
+
+### 4. Setup Deployment Directory
+
+```bash
+mkdir -p /opt/vtgtool/nginx /opt/vtgtool/logs /opt/vtgtool/backups
+cp /root/vtgtool/deploy/docker-compose.yml /opt/vtgtool/
+cp /root/vtgtool/deploy/nginx/prod.conf /opt/vtgtool/nginx/
+cp /root/vtgtool/deploy/deploy.sh /opt/vtgtool/
+cp /root/vtgtool/deploy/.env.example /opt/vtgtool/.env
+```
+
+### 5. Configure Environment
+
+```bash
 cd /opt/vtgtool
+nano .env  # Fill in DB_PASSWORD and SECRET_KEY
 ```
 
-### 3. Copy files to server
+### 6. Build Images
 
 ```bash
-# From your local machine:
-scp -r deploy/* root@your-server:/opt/vtgtool/
+cd /root/vtgtool/packages/backend
+docker build -t vtgtool-be:prod .
+
+cd /root/vtgtool/packages/frontend
+docker build -t vtgtool-fe:prod .
 ```
 
-### 4. Configure environment
+### 7. Start Services (HTTP first)
 
 ```bash
 cd /opt/vtgtool
-cp .env.example .env
-nano .env  # Edit with your values
+docker-compose up -d
 ```
 
-### 5. Setup SSL (Let's Encrypt)
+### 8. Setup SSL
 
 ```bash
-# Install certbot
-apt-get install -y certbot
+# Start với HTTP để certbot verify
+certbot certonly --webroot \
+  -w /var/lib/docker/volumes/vtgtool_certbot-webroot/_data \
+  -d vtgtool.help \
+  --non-interactive --agree-tos --email admin@vtgtool.help
 
-# Get certificates
-certbot certonly --standalone -d vtgtool.help -d www.vtgtool.help
-
-# For UAT:
-certbot certonly --standalone -d uat.vtgtool.help
+# Restart để apply SSL
+docker-compose restart frontend
 ```
 
 ## 🚀 Deployment Commands
 
-### Production
-
 ```bash
 cd /opt/vtgtool
 
-# Pull latest images
-docker compose pull
+# Deploy (no rebuild)
+./deploy.sh
 
-# Start services
-docker compose up -d
+# Rebuild images và deploy
+./deploy.sh rebuild
 
-# View logs
-docker compose logs -f
+# Backup DB trước khi deploy
+./deploy.sh rebuild backup
 
-# Restart
-docker compose restart
-
-# Stop
-docker compose down
+# Manual commands
+docker-compose up -d
+docker-compose down
+docker-compose logs -f backend
 ```
 
-### UAT (with local PostgreSQL)
+## 🔄 Update Code
 
 ```bash
+# Pull latest code
+cd /root/vtgtool
+git pull origin main
+
+# Rebuild và deploy
 cd /opt/vtgtool
-
-# Start with UAT override
-docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d
-
-# Or create alias in .bashrc:
-alias uat-up="docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d"
-```
-
-## 🔄 Update Deployment
-
-When CI/CD pushes new images:
-
-```bash
-cd /opt/vtgtool
-
-# Pull new images
-docker compose pull
-
-# Restart with new images (zero-downtime)
-docker compose up -d --no-deps backend frontend
-
-# Or full restart
-docker compose down && docker compose up -d
+./deploy.sh rebuild
 ```
 
 ## 🔧 Rollback
 
 ```bash
-# Edit .env to use previous image tag
-nano .env
-# Change: IMAGE_TAG=abc123 (previous commit SHA)
+# Checkout previous version
+cd /root/vtgtool
+git checkout <previous-commit>
 
-# Restart
-docker compose up -d
+# Rebuild
+./deploy.sh rebuild
 ```
 
 ## 📊 Monitoring
 
 ```bash
-# View all containers
-docker compose ps
+# Container status
+docker ps
 
-# View logs
-docker compose logs -f backend
-docker compose logs -f frontend
+# Logs
+docker logs vtg-backend-prod -f
+docker logs vtg-frontend-prod -f
 
-# Check health
-curl http://localhost/health
-curl http://localhost/api/health
+# Health check
+curl https://vtgtool.help/health
 ```
 
 ## 🔐 Security Checklist
-nge SECRET_KEY in .env                                                                                                                                                          
+
+- [ ] Change DB_PASSWORD in .env
+- [ ] Change SECRET_KEY in .env
 - [ ] Setup SSL certificates
 - [ ] Configure firewall (allow only 80, 443, 22)
-- [ ] Restrict database access
-- [ ] Enable Docker auto-updates
-
-- [ ] Cha
+- [ ] Setup automatic SSL renewal: `certbot renew --dry-run`

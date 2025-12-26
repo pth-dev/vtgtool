@@ -37,19 +37,6 @@ class AppConfig(Base):
     updated_by = Column(Integer, ForeignKey("users.id"))
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-class MergedDataSource(Base):
-    """Merged data from multiple DataSources"""
-    __tablename__ = "merged_data_sources"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    name = Column(String(255), nullable=False)
-    source_ids = Column(JSON, nullable=False)  # [1, 2, 3] - list of DataSource ids
-    data_type = Column(String(20), default="dashboard")
-    total_rows = Column(Integer)
-    columns_meta = Column(JSON)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
 class DashboardData(Base):
     __tablename__ = "dashboard_data"
     id = Column(Integer, primary_key=True)

@@ -1,14 +1,19 @@
 # =============================================
-# VTG TOOL - Production/UAT Deployment
+# VTG TOOL - Production Deployment
 # =============================================
-# File này được copy lên server production/uat
-# KHÔNG build image, chỉ PULL từ Docker Registry
+# Deploy lên Production server riêng
+#
+# SETUP:
+# 1. Copy folder deploy/ lên server: scp -r deploy/ user@prod-server:/opt/vtgtool/
+# 2. Tạo file .env từ .env.example
+# 3. Setup SSL: certbot certonly --webroot -w /var/lib/docker/volumes/vtgtool_certbot-webroot/_data -d vtgtool.help
+# 4. Chạy: docker-compose up -d
 #
 # Usage:
-#   docker compose up -d              # Start all services
-#   docker compose pull               # Pull latest images
-#   docker compose logs -f            # View logs
-#   docker compose down               # Stop all services
+#   docker-compose up -d              # Start all services
+#   docker-compose down               # Stop all services
+#   docker-compose logs -f            # View logs
+#   ./deploy.sh rebuild               # Rebuild và deploy
 
 services:
   # ===========================================
@@ -16,7 +21,7 @@ services:
   # ===========================================
   redis:
     image: redis:7-alpine
-    container_name: vtg-redis
+    container_name: vtg-redis-prod
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -27,22 +32,46 @@ services:
       - vtg-network
 
   # ===========================================
+  # PostgreSQL DATABASE (Production)
+  # ===========================================
+  db:
+    image: postgres:15-alpine
+    container_name: vtg-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-vtg_prod}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-vtgtool_prod}
+    volumes:
+      - pgdata-prod:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vtg_prod}"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - vtg-network
+
+  # ===========================================
   # BACKEND API
   # ===========================================
   backend:
-    image: ${DOCKERHUB_USERNAME}/vtgtool-be:${IMAGE_TAG:-latest}
-    container_name: vtg-backend
+    image: vtgtool-be:${IMAGE_TAG:-prod}
+    container_name: vtg-backend-prod
     restart: always
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-vtg_prod}:${DB_PASSWORD}@db:5432/${DB_NAME:-vtgtool_prod}
       - SECRET_KEY=${SECRET_KEY}
       - REDIS_URL=redis://redis:6379
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENVIRONMENT=production
       - UPLOAD_DIR=/app/uploads
     volumes:
       - uploads:/app/uploads
       - ./logs:/app/logs
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -50,28 +79,28 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
     networks:
       - vtg-network
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
 
   # ===========================================
-  # FRONTEND (NGINX)
+  # FRONTEND (NGINX with SSL)
   # ===========================================
   frontend:
-    image: ${DOCKERHUB_USERNAME}/vtgtool-fe:${IMAGE_TAG:-latest}
-    container_name: vtg-frontend
+    image: vtgtool-fe:${IMAGE_TAG:-prod}
+    container_name: vtg-frontend-prod
     restart: always
     ports:
-      - "${FRONTEND_PORT:-80}:80"
-      - "${FRONTEND_SSL_PORT:-443}:443"
+      - "80:80"
+      - "443:443"
     volumes:
-      # Mount SSL certificates từ host
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
-      # Mount nginx config tùy theo môi trường
-      - ./nginx/${NGINX_CONFIG:-prod.conf}:/etc/nginx/conf.d/default.conf:ro
+      - certbot-webroot:/var/www/certbot:ro
     depends_on:
       backend:
         condition: service_healthy
@@ -80,7 +109,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 256M
 
 networks:
   vtg-network:
@@ -88,3 +117,6 @@ networks:
 
 volumes:
   uploads:
+  pgdata-prod:
+    name: vtg-pgdata-prod
+  certbot-webroot:

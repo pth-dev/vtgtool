@@ -1,6 +1,6 @@
 import asyncio
 from app.core.database import engine, Base
-from app.models.models import User, DataSource, AppConfig, MergedDataSource, DashboardData
+from app.models.models import User, DataSource, AppConfig, DashboardData
 
 async def init_db():
     async with engine.begin() as conn:
