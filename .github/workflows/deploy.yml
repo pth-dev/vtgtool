@@ -114,15 +114,15 @@ jobs:
           envs: IMAGE_TAG,BACKEND_IMAGE,FRONTEND_IMAGE
           script: |
             cd /opt/vtgtool
-            
+
             # Update image tag
             sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|g" .env
-            
-            # Pull and restart
-            docker compose pull
-            docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d
+
+            # Pull and restart (use docker-compose for compatibility)
+            docker-compose pull
+            docker-compose -f docker-compose.yml -f docker-compose.uat.yml up -d --remove-orphans
             docker image prune -f
-            
+
             echo "✅ UAT deployed: $IMAGE_TAG"
 
   # ============================================
@@ -149,15 +149,15 @@ jobs:
           envs: IMAGE_TAG,BACKEND_IMAGE,FRONTEND_IMAGE
           script: |
             cd /opt/vtgtool
-            
+
             # Update image tag
             sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|g" .env
-            
-            # Pull and restart (zero-downtime)
-            docker compose pull
-            docker compose up -d --no-deps backend
+
+            # Pull and restart (zero-downtime, use docker-compose for compatibility)
+            docker-compose pull
+            docker-compose up -d --no-deps backend
             sleep 5
-            docker compose up -d --no-deps frontend
+            docker-compose up -d --no-deps frontend
             docker image prune -f
-            
+
             echo "✅ Production deployed: $IMAGE_TAG"
