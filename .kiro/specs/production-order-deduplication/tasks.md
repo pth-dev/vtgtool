@@ -62,7 +62,7 @@ Triển khai chức năng tự động loại bỏ Production Order trùng lặp
     - Kiểm tra các chart queries
     - _Requirements: 2.4_
 
-- [-] 6. Final Checkpoint
+- [x] 6. Final Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
   - Run migration trên development database
   - Test end-to-end với file upload thực tế

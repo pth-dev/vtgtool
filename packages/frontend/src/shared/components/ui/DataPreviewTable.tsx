@@ -45,14 +45,22 @@ export function DataPreviewTable({
   emptyMessage = 'No data available',
   headerInfo,
 }: DataPreviewTableProps) {
-  const columnNames = columnSchemas?.map((c) => c.name) || (data.length > 0 ? Object.keys(data[0]) : [])
+  // Get column names from schema, but also include any columns in data that aren't in schema
+  const schemaColumnNames = columnSchemas?.map((c) => c.name) || []
+  const dataColumnNames = data.length > 0 ? Object.keys(data[0]) : []
+  // Use schema order first, then add any missing columns from data
+  const columnNames = schemaColumnNames.length > 0 
+    ? [...schemaColumnNames, ...dataColumnNames.filter(name => !schemaColumnNames.includes(name))]
+    : dataColumnNames
   const totalCount = total ?? data.length
 
   const columns = useMemo<ColumnDef<Record<string, unknown>, unknown>[]>(() => 
     columnNames.map((name) => {
       const schema = columnSchemas?.find((c) => c.name === name)
       return {
-        accessorKey: name,
+        id: name,
+        // Use accessorFn instead of accessorKey to handle keys with dots (e.g., "Production Order No.")
+        accessorFn: (row) => row[name],
         header: () => (
           <>
             <Tooltip title={name}><span>{name}</span></Tooltip>

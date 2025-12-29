@@ -2,7 +2,11 @@
 Deduplication Service for Production Order data.
 
 This service handles removing duplicate Production Orders across different
-reporting days, keeping only the record with the most recent reporting day.
+reporting days, keeping records from the most recent reporting day only.
+
+IMPORTANT: Same Production Order No. on the SAME day should be kept (counted each time).
+Only remove duplicates when the SAME Production Order No. appears on DIFFERENT days
+(keep only the latest day).
 """
 
 from dataclasses import dataclass, field
@@ -34,7 +38,8 @@ class DeduplicationService:
     Service to handle Production Order deduplication.
     
     Deduplication rules:
-    - For each unique Production Order No., keep only the record with the latest Reporting day
+    - Same Production Order No. + Same Reporting day → KEEP ALL (count each occurrence)
+    - Same Production Order No. + Different Reporting day → Keep only the LATEST day's records
     - Records with NULL Production Order No. are not deduplicated
     - Exact string matching is used (case-sensitive)
     """
@@ -45,8 +50,8 @@ class DeduplicationService:
     @staticmethod
     def deduplicate_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, DeduplicationResult]:
         """
-        Deduplicate DataFrame by keeping only the latest Reporting day 
-        for each Production Order No.
+        Deduplicate DataFrame by keeping only records from the latest Reporting day 
+        for each Production Order No. Records with same PON on same day are ALL kept.
         
         Args:
             df: DataFrame with 'Production Order No.' and 'Reporting day' columns
@@ -97,35 +102,37 @@ class DeduplicationService:
                 duplicate_details=[]
             )
         
-        # Sort by Reporting day descending so latest comes first
-        df_sorted = df_non_null.sort_values(
-            DeduplicationService.REPORTING_DAY_COL, 
-            ascending=False
-        )
+        # Find the latest reporting day for each Production Order No.
+        latest_days = df_non_null.groupby(DeduplicationService.PRODUCTION_ORDER_COL)[
+            DeduplicationService.REPORTING_DAY_COL
+        ].max().reset_index()
+        latest_days.columns = [DeduplicationService.PRODUCTION_ORDER_COL, '_latest_day']
         
-        # Find duplicates before removing (for logging)
-        duplicates = df_sorted[
-            df_sorted.duplicated(DeduplicationService.PRODUCTION_ORDER_COL, keep='first')
+        # Merge to get latest day for each row
+        df_with_latest = df_non_null.merge(latest_days, on=DeduplicationService.PRODUCTION_ORDER_COL)
+        
+        # Keep only rows where reporting_day == latest_day for that PON
+        # This keeps ALL records from the latest day (including duplicates on same day)
+        df_deduped = df_with_latest[
+            df_with_latest[DeduplicationService.REPORTING_DAY_COL] == df_with_latest['_latest_day']
+        ].drop(columns=['_latest_day'])
+        
+        # Build duplicate details for logging (records removed from older days)
+        duplicate_details = []
+        removed_records = df_with_latest[
+            df_with_latest[DeduplicationService.REPORTING_DAY_COL] != df_with_latest['_latest_day']
         ]
         
-        # Build duplicate details for logging
-        duplicate_details = []
-        for order_no in duplicates[DeduplicationService.PRODUCTION_ORDER_COL].unique():
-            removed_dates = duplicates[
-                duplicates[DeduplicationService.PRODUCTION_ORDER_COL] == order_no
-            ][DeduplicationService.REPORTING_DAY_COL].tolist()
+        for order_no in removed_records[DeduplicationService.PRODUCTION_ORDER_COL].unique():
+            removed_dates = removed_records[
+                removed_records[DeduplicationService.PRODUCTION_ORDER_COL] == order_no
+            ][DeduplicationService.REPORTING_DAY_COL].unique().tolist()
             
             duplicate_details.append({
                 'production_order': str(order_no),
                 'dates_removed': [str(d) for d in removed_dates]
             })
-            logger.info(f"Duplicate found: {order_no} - removing dates: {removed_dates}")
-        
-        # Remove duplicates, keep first (latest date)
-        df_deduped = df_sorted.drop_duplicates(
-            DeduplicationService.PRODUCTION_ORDER_COL, 
-            keep='first'
-        )
+            logger.info(f"Duplicate found: {order_no} - removing older dates: {removed_dates}")
         
         # Combine with NULL records
         df_result = pd.concat([df_deduped, df_null], ignore_index=True)
@@ -155,7 +162,10 @@ class DeduplicationService:
     ) -> DeduplicationResult:
         """
         After inserting new records, deduplicate against existing records 
-        from ALL sources. Keeps the record with latest Reporting day.
+        from ALL sources.
+        
+        IMPORTANT: Keep ALL records from the LATEST reporting day for each PON.
+        Only remove records from OLDER days when the same PON exists on a newer day.
         
         Args:
             db: Database session
@@ -180,18 +190,16 @@ class DeduplicationService:
                 duplicate_details=[]
             )
         
-        # Delete duplicates using PostgreSQL DISTINCT ON
-        # Keep the record with latest reporting_day for each production_order_no
-        # If same date, keep the one with highest id (most recently inserted)
+        # Delete records from OLDER days when same PON exists on a NEWER day
+        # Keep ALL records from the latest day (including multiple occurrences on same day)
         delete_sql = text("""
             DELETE FROM dashboard_data d
-            WHERE d.id NOT IN (
-                SELECT DISTINCT ON (production_order_no) id
-                FROM dashboard_data
-                WHERE production_order_no IS NOT NULL
-                ORDER BY production_order_no, reporting_day DESC NULLS LAST, id DESC
+            WHERE d.production_order_no IS NOT NULL
+            AND d.reporting_day < (
+                SELECT MAX(d2.reporting_day)
+                FROM dashboard_data d2
+                WHERE d2.production_order_no = d.production_order_no
             )
-            AND d.production_order_no IS NOT NULL
         """)
         
         result = await db.execute(delete_sql)
@@ -208,7 +216,7 @@ class DeduplicationService:
         if duplicates_removed > 0:
             logger.info(
                 f"Database deduplication: {count_before} -> {count_after} records "
-                f"({duplicates_removed} removed)"
+                f"({duplicates_removed} removed from older days)"
             )
         else:
             logger.info("No duplicates found in database")

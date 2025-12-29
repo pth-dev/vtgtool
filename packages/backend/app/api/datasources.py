@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, delete, func
+from sqlalchemy import select, insert, delete, func, or_
 import os, uuid
 import pandas as pd
 import logging
@@ -109,6 +109,9 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                                         val = int(float(val)) if val else 0
                                     except (ValueError, TypeError):
                                         val = 0
+                                elif db_col == 'production_order_no':
+                                    # Ensure string (some Excel files have numeric values)
+                                    val = str(val).strip() if val else None
                                 record[db_col] = val
                         db_data.append(record)
                     
@@ -273,6 +276,49 @@ async def preview(id: int, rows: int = Query(100, ge=1, le=500), db: AsyncSessio
         raise HTTPException(404, "Not found")
     if not os.path.exists(source.file_path):
         raise HTTPException(404, "File not found on server")
+    
+    # For dashboard data, read from DB (after deduplication) instead of raw file
+    if source.data_type == "dashboard":
+        # Get actual row count from DB
+        db_count_result = await db.execute(
+            select(func.count()).select_from(DashboardData).where(DashboardData.source_id == id)
+        )
+        db_row_count = db_count_result.scalar() or 0
+        
+        # Get preview data from DB
+        db_result = await db.execute(
+            select(DashboardData)
+            .where(DashboardData.source_id == id)
+            .order_by(DashboardData.reporting_day.desc())
+            .limit(rows)
+        )
+        db_rows = db_result.scalars().all()
+        
+        # Convert to dict format matching original columns
+        preview_data = []
+        for row in db_rows:
+            preview_data.append({
+                "Reporting day": row.reporting_day.isoformat() if row.reporting_day else None,
+                "Customer": row.customer or "",
+                "Product": row.product or "",
+                "Production Order No.": row.production_order_no or "",
+                "Status": row.status or "",
+                "Remark": row.root_cause or "",
+                "Category": row.category or "",
+                "Current status": row.current_status or "",
+                "Production No": row.production_no or 0,
+                "Root cause": row.root_cause or "",
+                "Improvement plan": row.improvement_plan or ""
+            })
+        
+        return {
+            "columns": source.columns_meta, 
+            "data": preview_data, 
+            "total_rows": db_row_count,  # Use DB count (after dedup)
+            "preview_rows": min(rows, db_row_count)
+        }
+    
+    # For non-dashboard data, read from file as before
     df = FileParser.parse(source.file_path)
     preview_df = df.head(rows).fillna("")
     return {"columns": source.columns_meta, "data": preview_df.to_dict(orient="records"), "total_rows": source.row_count, "preview_rows": min(rows, source.row_count or 0)}
@@ -287,6 +333,79 @@ async def get_data(
     source = result.scalar_one_or_none()
     if not source:
         raise HTTPException(404, "Not found")
+    
+    # For dashboard data, read from DB (after deduplication)
+    if source.data_type == "dashboard":
+        from sqlalchemy import asc as sql_asc, desc as sql_desc
+        
+        # Build query
+        query = select(DashboardData).where(DashboardData.source_id == id)
+        
+        # Search filter
+        if search:
+            search_filter = or_(
+                DashboardData.customer.ilike(f"%{search}%"),
+                DashboardData.product.ilike(f"%{search}%"),
+                DashboardData.production_order_no.ilike(f"%{search}%"),
+                DashboardData.status.ilike(f"%{search}%"),
+                DashboardData.category.ilike(f"%{search}%"),
+                DashboardData.root_cause.ilike(f"%{search}%")
+            )
+            query = query.where(search_filter)
+        
+        # Count total
+        count_query = select(func.count()).select_from(query.subquery())
+        total = await db.scalar(count_query) or 0
+        
+        # Sorting
+        sort_column_map = {
+            "Reporting day": DashboardData.reporting_day,
+            "Customer": DashboardData.customer,
+            "Product": DashboardData.product,
+            "Production Order No.": DashboardData.production_order_no,
+            "Status": DashboardData.status,
+            "Category": DashboardData.category,
+            "Production No": DashboardData.production_no,
+        }
+        if sort_by and sort_by in sort_column_map:
+            col = sort_column_map[sort_by]
+            query = query.order_by(sql_asc(col) if sort_order == "asc" else sql_desc(col))
+        else:
+            query = query.order_by(sql_desc(DashboardData.reporting_day))
+        
+        # Pagination
+        start = (page - 1) * page_size
+        query = query.offset(start).limit(page_size)
+        
+        db_result = await db.execute(query)
+        db_rows = db_result.scalars().all()
+        
+        # Convert to dict format
+        data = []
+        for row in db_rows:
+            data.append({
+                "Reporting day": row.reporting_day.isoformat() if row.reporting_day else None,
+                "Customer": row.customer or "",
+                "Product": row.product or "",
+                "Production Order No.": row.production_order_no or "",
+                "Status": row.status or "",
+                "Category": row.category or "",
+                "Current status": row.current_status or "",
+                "Production No": row.production_no or 0,
+                "Root cause": row.root_cause or "",
+                "Improvement plan": row.improvement_plan or ""
+            })
+        
+        return {
+            "columns": source.columns_meta, 
+            "data": data, 
+            "total": total, 
+            "page": page, 
+            "page_size": page_size, 
+            "total_pages": (total + page_size - 1) // page_size
+        }
+    
+    # For non-dashboard data, read from file as before
     if not os.path.exists(source.file_path):
         raise HTTPException(404, "File not found")
     
