@@ -42,12 +42,13 @@ class DashboardData(Base):
     id = Column(Integer, primary_key=True)
     source_id = Column(Integer, ForeignKey("data_sources.id"), index=True)
     reporting_day = Column(Date, index=True)
+    production_order_no = Column(String(100), index=True)  # Production Order Number (e.g., RR11541B)
     customer = Column(String(255), index=True)
     category = Column(String(255), index=True)
     product = Column(String(255), index=True)
     status = Column(String(50), index=True)
     current_status = Column(String(50))
-    production_no = Column(Integer)  # Use 0 if missing
+    production_no = Column(Integer)  # Production quantity, use 0 if missing
     root_cause = Column(String(500))
     improvement_plan = Column(Text)
     created_at = Column(DateTime, server_default=func.now())

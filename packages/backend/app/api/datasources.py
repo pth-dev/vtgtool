@@ -12,6 +12,7 @@ from app.models.models import User, DataSource, DashboardData
 from app.api.auth import get_current_user
 from app.schemas.schemas import DataSourceResponse
 from app.services.data_processor import FileParser, SchemaDetector, DataValidator
+from app.services.deduplication import DeduplicationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -62,9 +63,14 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
 
                 # --- Database Ingestion for Dashboard Data ---
                 if data_type == "dashboard":
+                    # Step 1: Deduplicate within the uploaded file
+                    df_new, file_dedup_result = DeduplicationService.deduplicate_dataframe(df_new)
+                    logger.info(f"File deduplication for source {source_id}: removed {file_dedup_result.duplicates_removed} duplicates")
+                    
                     # Map DataFrame columns to DashboardData model
                     column_mapping = {
                         'Reporting day': 'reporting_day',
+                        'Production Order No.': 'production_order_no',
                         'Customer': 'customer',
                         'Category': 'category',
                         'Product': 'product',
@@ -115,6 +121,10 @@ async def process_upload_task(source_id: int, file_path: str, data_type: str):
                         # Commit after all chunks
                         await db.commit()
                         logger.info(f"Successfully inserted {len(db_data)} records for source {source_id}")
+                        
+                        # Step 2: Deduplicate against existing data from other sources
+                        db_dedup_result = await DeduplicationService.deduplicate_against_existing(db, source_id)
+                        logger.info(f"DB deduplication for source {source_id}: removed {db_dedup_result.duplicates_removed} duplicates across all sources")
 
                 # ---------------------------------------------
                 

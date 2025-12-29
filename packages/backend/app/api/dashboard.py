@@ -522,14 +522,15 @@ async def get_drilldown_data(
     data = []
     for row in rows:
         data.append({
-            "Production Order No.": row.production_no,
+            "Production Order No.": row.production_order_no,
             "Customer": row.customer,
             "Category": row.category,
             "Product": row.product,
             "Status": row.status,
             "Current status": row.current_status,
             "Root cause": row.root_cause,
-            "Reporting day": row.reporting_day.isoformat() if row.reporting_day else None
+            "Reporting day": row.reporting_day.isoformat() if row.reporting_day else None,
+            "Production No": row.production_no
         })
         
     return {
