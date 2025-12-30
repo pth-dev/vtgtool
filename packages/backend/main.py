@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.api import auth, datasources, dashboard, config, isc
+from app.api import auth, config, isc
+from app.api.dashboard import router as dashboard_router
+from app.api.datasources import router as datasources_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
+from app.core.exceptions import VTGToolException, vtg_exception_handler, global_exception_handler
 import logging
 
 # Setup logging
@@ -27,6 +30,10 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Add global exception handlers
+app.add_exception_handler(VTGToolException, vtg_exception_handler)
+app.add_exception_handler(Exception, global_exception_handler)
+
 logger.info(f"Starting VTGTOOL API in {settings.ENVIRONMENT} mode")
 
 # Configure CORS based on environment
@@ -43,18 +50,31 @@ else:
         "http://localhost:80",
     ]
 
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],  # Specific methods only
-    allow_headers=["Content-Type", "Authorization", "Cookie"],  # Specific headers only
-    max_age=3600,  # Cache preflight requests for 1 hour
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Content-Type", "Authorization", "Cookie"],
+    max_age=3600,
 )
 
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["📊 Dashboard"])
+app.include_router(dashboard_router, prefix="/api/dashboard", tags=["📊 Dashboard"])
 app.include_router(auth.router, prefix="/api/auth", tags=["🔐 Authentication"])
-app.include_router(datasources.router, prefix="/api/datasources", tags=["📁 Data Sources"])
+app.include_router(datasources_router, prefix="/api/datasources", tags=["📁 Data Sources"])
 app.include_router(config.router, prefix="/api", tags=["⚙️ Config"])
 app.include_router(isc.router, prefix="/api/isc", tags=["🔍 ISC DO System"])
 

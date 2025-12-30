@@ -61,3 +61,23 @@ class DataSourceResponse(BaseModel):
     data_type: str = "dashboard"
     status: str
     created_at: datetime
+
+
+# Common Responses
+class MessageResponse(BaseModel):
+    """Simple message response"""
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    """Standard error response"""
+    error: str = Field(description="Error code")
+    message: str = Field(description="Human-readable error message")
+    detail: Optional[str] = Field(None, description="Additional error details")
+
+
+class SuccessResponse(BaseModel):
+    """Simple success response"""
+    ok: bool = True
+    message: Optional[str] = None
+

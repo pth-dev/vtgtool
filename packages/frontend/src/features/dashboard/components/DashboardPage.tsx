@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
 
@@ -11,11 +11,18 @@ import { type TreemapItem } from '@/features/dashboard/charts'
 import { AlertBanner } from './AlertBanner'
 import { CompareKpiSection } from './CompareKpiSection'
 import { DrilldownDialog } from './DrilldownDialog'
-import { EditableChartsGrid } from './EditableChartsGrid'
-import { EditableCompareGrid } from './EditableCompareGrid'
 import { ExportButton } from './ExportButton'
 import { KpiSection } from './KpiSection'
 import { ModeToggle, type DashboardMode } from './ModeToggle'
+import { ChartSkeleton } from '@/shared/components/ui/Skeletons'
+
+// Lazy load heavy chart grids
+const EditableChartsGrid = lazy(() =>
+  import('./EditableChartsGrid').then(module => ({ default: module.EditableChartsGrid }))
+)
+const EditableCompareGrid = lazy(() =>
+  import('./EditableCompareGrid').then(module => ({ default: module.EditableCompareGrid }))
+)
 
 interface DrilldownData {
   data: Record<string, unknown>[]
@@ -59,7 +66,7 @@ export default function DashboardPage() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [mode, setMode] = useState<DashboardMode>('single')
-  
+
   const {
     data,
     isLoading,
@@ -160,15 +167,15 @@ export default function DashboardPage() {
           zIndex: 10,
         }}
       >
-        <Stack 
-          direction="row" 
-          justifyContent="space-between" 
+        <Stack
+          direction="row"
+          justifyContent="space-between"
           alignItems="center"
           spacing={1}
         >
           <PageHeader
             title={isMobile ? 'Dashboard' : 'Lock/Hold/Failed Dashboard'}
-            subtitle={!isMobile && mode === 'single' 
+            subtitle={!isMobile && mode === 'single'
               ? (data.source_name ? `Source: ${data.source_name}` : undefined)
               : (!isMobile ? 'Last 6 Months Comparison' : undefined)
             }
@@ -217,46 +224,56 @@ export default function DashboardPage() {
               <KpiSection kpis={data.kpis} momChange={momChange} isMobile={isMobile} />
             </Box>
 
-            <EditableChartsGrid
-              charts={data.charts}
-              rootCauses={data.root_causes || []}
-              treemapData={decompositionData?.data || null}
-              crossFilter={crossFilter}
-              onCrossFilter={toggleCrossFilter}
-              onShowData={handleShowData}
-              isMobile={isMobile}
-            />
-        </>
-      )}
+            <Suspense fallback={
+              <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: '1fr 1fr' }} gap={2}>
+                <ChartSkeleton />
+                <ChartSkeleton />
+                <Box gridColumn={{ md: '1 / -1' }}><ChartSkeleton /></Box>
+              </Box>
+            }>
+              <EditableChartsGrid
+                charts={data.charts}
+                rootCauses={data.root_causes || []}
+                treemapData={decompositionData?.data || null}
+                crossFilter={crossFilter}
+                onCrossFilter={toggleCrossFilter}
+                onShowData={handleShowData}
+                isMobile={isMobile}
+              />
+            </Suspense>
+          </>
+        )}
 
-      {/* ========== COMPARE MODE ========== */}
-      {mode === 'compare' && comparisonData && (
-        <>
-          <CompareKpiSection data={comparisonData.aggregated} isMobile={isMobile} />
-          <EditableCompareGrid data={comparisonData} isMobile={isMobile} />
-        </>
-      )}
+        {/* ========== COMPARE MODE ========== */}
+        {mode === 'compare' && comparisonData && (
+          <>
+            <CompareKpiSection data={comparisonData.aggregated} isMobile={isMobile} />
+            <Suspense fallback={<ChartSkeleton height={400} />}>
+              <EditableCompareGrid data={comparisonData} isMobile={isMobile} />
+            </Suspense>
+          </>
+        )}
 
-      {/* Drilldown Dialog */}
-      {drilldown && (
-        <DrilldownDialog
-          open={!!drilldown}
-          dimension={drilldown.dimension}
-          value={drilldown.value}
-          data={drilldownData?.data || []}
-          columns={drilldownData?.columns || []}
-          total={drilldownData?.total || 0}
-          page={drilldownPage}
-          rowsPerPage={drilldownRowsPerPage}
-          isLoading={isDrilldownLoading}
-          onClose={handleCloseDrilldown}
-          onPageChange={setDrilldownPage}
-          onRowsPerPageChange={(rows) => {
-            setDrilldownRowsPerPage(rows)
-            setDrilldownPage(0)
-          }}
-        />
-      )}
+        {/* Drilldown Dialog */}
+        {drilldown && (
+          <DrilldownDialog
+            open={!!drilldown}
+            dimension={drilldown.dimension}
+            value={drilldown.value}
+            data={drilldownData?.data || []}
+            columns={drilldownData?.columns || []}
+            total={drilldownData?.total || 0}
+            page={drilldownPage}
+            rowsPerPage={drilldownRowsPerPage}
+            isLoading={isDrilldownLoading}
+            onClose={handleCloseDrilldown}
+            onPageChange={setDrilldownPage}
+            onRowsPerPageChange={(rows) => {
+              setDrilldownRowsPerPage(rows)
+              setDrilldownPage(0)
+            }}
+          />
+        )}
       </Box>
     </Box>
   )

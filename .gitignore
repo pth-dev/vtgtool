@@ -60,3 +60,7 @@ secrets/
 *.sql
 backup-*.sql
 *.backup
+
+# AI,mcp
+.kiro
+.serena

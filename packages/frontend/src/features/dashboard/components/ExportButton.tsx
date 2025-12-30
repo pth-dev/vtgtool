@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Button, Menu, MenuItem } from '@mui/material'
+import { Button, CircularProgress, Menu, MenuItem } from '@mui/material'
 import { FileDownload } from '@mui/icons-material'
-import * as XLSX from 'xlsx'
 
 interface ExportData {
   kpis: Record<string, unknown>
@@ -18,40 +17,50 @@ interface ExportButtonProps {
 
 export function ExportButton({ data }: ExportButtonProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
-  const handleExport = (type: 'kpis' | 'customer' | 'category' | 'all') => {
-    const wb = XLSX.utils.book_new()
-    const month = data.selectedMonth || 'data'
-
-    if (type === 'kpis' || type === 'all') {
-      const kpiData = Object.entries(data.kpis).map(([key, value]) => ({
-        Metric: key.replace(/_/g, ' ').toUpperCase(),
-        Value: typeof value === 'object' ? JSON.stringify(value) : value,
-      }))
-      const ws = XLSX.utils.json_to_sheet(kpiData)
-      XLSX.utils.book_append_sheet(wb, ws, 'KPIs')
-    }
-
-    if ((type === 'customer' || type === 'all') && data.charts.by_customer) {
-      const ws = XLSX.utils.json_to_sheet(data.charts.by_customer.map(d => ({
-        Customer: d.name,
-        Count: d.count,
-        'Percent (%)': d.percent,
-      })))
-      XLSX.utils.book_append_sheet(wb, ws, 'By Customer')
-    }
-
-    if ((type === 'category' || type === 'all') && data.charts.by_category) {
-      const ws = XLSX.utils.json_to_sheet(data.charts.by_category.map(d => ({
-        Category: d.name,
-        Count: d.count,
-        'Percent (%)': d.percent,
-      })))
-      XLSX.utils.book_append_sheet(wb, ws, 'By Category')
-    }
-
-    XLSX.writeFile(wb, `dashboard_${month}.xlsx`)
+  const handleExport = async (type: 'kpis' | 'customer' | 'category' | 'all') => {
+    setIsExporting(true)
     setAnchorEl(null)
+    
+    try {
+      // Dynamic import - only load XLSX when user actually exports
+      const XLSX = await import('xlsx')
+      
+      const wb = XLSX.utils.book_new()
+      const month = data.selectedMonth || 'data'
+
+      if (type === 'kpis' || type === 'all') {
+        const kpiData = Object.entries(data.kpis).map(([key, value]) => ({
+          Metric: key.replace(/_/g, ' ').toUpperCase(),
+          Value: typeof value === 'object' ? JSON.stringify(value) : value,
+        }))
+        const ws = XLSX.utils.json_to_sheet(kpiData)
+        XLSX.utils.book_append_sheet(wb, ws, 'KPIs')
+      }
+
+      if ((type === 'customer' || type === 'all') && data.charts.by_customer) {
+        const ws = XLSX.utils.json_to_sheet(data.charts.by_customer.map(d => ({
+          Customer: d.name,
+          Count: d.count,
+          'Percent (%)': d.percent,
+        })))
+        XLSX.utils.book_append_sheet(wb, ws, 'By Customer')
+      }
+
+      if ((type === 'category' || type === 'all') && data.charts.by_category) {
+        const ws = XLSX.utils.json_to_sheet(data.charts.by_category.map(d => ({
+          Category: d.name,
+          Count: d.count,
+          'Percent (%)': d.percent,
+        })))
+        XLSX.utils.book_append_sheet(wb, ws, 'By Category')
+      }
+
+      XLSX.writeFile(wb, `dashboard_${month}.xlsx`)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -59,10 +68,11 @@ export function ExportButton({ data }: ExportButtonProps) {
       <Button
         size="small"
         variant="outlined"
-        startIcon={<FileDownload />}
+        startIcon={isExporting ? <CircularProgress size={16} /> : <FileDownload />}
         onClick={(e) => setAnchorEl(e.currentTarget)}
+        disabled={isExporting}
       >
-        Export
+        {isExporting ? 'Exporting...' : 'Export'}
       </Button>
       <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={() => setAnchorEl(null)}>
         <MenuItem onClick={() => handleExport('all')}>Export All</MenuItem>

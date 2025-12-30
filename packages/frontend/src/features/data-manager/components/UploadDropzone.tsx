@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react'
 
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import { Alert, Box, LinearProgress, Typography, useTheme } from '@mui/material'
-import * as XLSX from 'xlsx'
 
 import { ERROR_MESSAGES, FILE_UPLOAD } from '@/constants'
 
@@ -72,6 +71,8 @@ export function UploadDropzone({ onFileSelected, onError }: Props) {
             })
           }
         } else if (ext === 'xlsx' || ext === 'xls') {
+          // Dynamic import - only load XLSX when parsing Excel files
+          const XLSX = await import('xlsx')
           const buffer = await file.arrayBuffer()
           setProgress(50)
           const workbook = XLSX.read(buffer, { type: 'array' })

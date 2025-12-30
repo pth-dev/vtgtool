@@ -10,8 +10,15 @@ _redis: redis.Redis | None = None
 async def get_redis() -> redis.Redis:
     global _redis
     if _redis is None:
-        _redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
-        logger.info("Redis connection established")
+        _redis = redis.from_url(
+            settings.REDIS_URL, 
+            decode_responses=True,
+            max_connections=20,  # Connection pool size
+            socket_timeout=5.0,  # Read/write timeout
+            socket_connect_timeout=5.0,  # Connection timeout
+            retry_on_timeout=True,
+        )
+        logger.info("Redis connection pool established")
     return _redis
 
 async def cache_get(key: str):

@@ -1,5 +1,15 @@
-import ReactECharts from 'echarts-for-react'
+import { useMemo } from 'react'
 import { useTheme } from '@mui/material'
+
+// Import only required ECharts modules for smaller bundle
+import * as echarts from 'echarts/core'
+import { TreemapChart } from 'echarts/charts'
+import { TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import ReactEChartsCore from 'echarts-for-react/lib/core'
+
+// Register only what we need
+echarts.use([TreemapChart, TooltipComponent, CanvasRenderer])
 
 interface TreemapItem {
   x: string
@@ -18,7 +28,7 @@ export function EChartsTreemap({ data, height, onItemClick }: Props) {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
 
-  const option = {
+  const option = useMemo(() => ({
     tooltip: {
       formatter: (info: { name: string; value: number; data: TreemapItem }) => {
         return `<div style="padding:4px 8px;">
@@ -45,7 +55,6 @@ export function EChartsTreemap({ data, height, onItemClick }: Props) {
           show: true,
           formatter: (params: { data: TreemapItem }) => {
             const name = params.data.x
-            // Truncate if too long, show full in tooltip
             const displayName = name.length > 40 ? name.slice(0, 40) + '...' : name
             return `${displayName}\n${params.data.percent}%`
           },
@@ -77,21 +86,24 @@ export function EChartsTreemap({ data, height, onItemClick }: Props) {
         })),
       },
     ],
-  }
+  }), [data, isDark])
 
-  const onEvents = {
+  const onEvents = useMemo(() => ({
     click: (params: { data: { x: string; hasChildren?: boolean } }) => {
       if (onItemClick && params.data?.x) {
         onItemClick(params.data.x)
       }
     },
-  }
+  }), [onItemClick])
 
   return (
-    <ReactECharts
+    <ReactEChartsCore
+      echarts={echarts}
       option={option}
       style={{ height, width: '100%' }}
       onEvents={onEvents}
+      notMerge
+      lazyUpdate
     />
   )
 }

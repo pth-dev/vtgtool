@@ -1,172 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, delete, func, or_
-import os, uuid
+"""
+Datasources API routes
+"""
+import os
+import uuid
+import magic
 import pandas as pd
 import logging
-import magic
-from app.core.database import get_db, async_session
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete, func, or_
+from sqlalchemy import asc as sql_asc, desc as sql_desc
+
+from app.core.database import get_db
 from app.core.config import settings
 from app.core.cache import cache_delete
 from app.models.models import User, DataSource, DashboardData
 from app.api.auth import get_current_user
-from app.schemas.schemas import DataSourceResponse
+from app.schemas.schemas import DataSourceResponse, SuccessResponse
+from app.schemas.datasources import (
+    DataSourceListResponse,
+    PreviewResponse,
+    DataResponse,
+    ValidationResponse,
+    SchemaResponse,
+    ProcessResponse,
+    DeleteResponse,
+)
 from app.services.data_processor import FileParser, SchemaDetector, DataValidator
-from app.services.deduplication import DeduplicationService
+
+from .upload import process_upload_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize data types: Reporting day -> date, Production No -> number"""
-    if 'Reporting day' in df.columns:
-        df['Reporting day'] = pd.to_datetime(df['Reporting day'], errors='coerce').dt.strftime('%Y-%m-%d')
-    if 'Production No' in df.columns:
-        df['Production No'] = pd.to_numeric(df['Production No'], errors='coerce').fillna(0).astype(int)
-    return df
-
-def process_isc_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Process ISC data: only keep Item code and Avg Consume, convert Avg Consume to positive"""
-    required_cols = ['Item code', 'Avg Consume']
-    
-    # Check required columns exist
-    missing = [c for c in required_cols if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing required columns: {missing}")
-    
-    # Only keep required columns
-    df_result = df[required_cols].copy()
-    
-    # Convert Avg Consume to positive number, preserve original precision
-    df_result['Avg Consume'] = pd.to_numeric(df_result['Avg Consume'], errors='coerce').abs()
-    
-    return df_result
-
-async def process_upload_task(source_id: int, file_path: str, data_type: str):
-    """Background task to process uploaded file"""
-    async with async_session() as db:
-        try:
-            # Fetch source
-            result = await db.execute(select(DataSource).where(DataSource.id == source_id))
-            source = result.scalar_one_or_none()
-            if not source:
-                return
-
-            try:
-                df_new = FileParser.parse(file_path)
-                
-                # Process based on data_type
-                if data_type == "isc":
-                    df_new = process_isc_data(df_new)
-                else:
-                    df_new = normalize_dataframe(df_new)
-
-                # --- Database Ingestion for Dashboard Data ---
-                if data_type == "dashboard":
-                    # Step 1: Deduplicate within the uploaded file
-                    df_new, file_dedup_result = DeduplicationService.deduplicate_dataframe(df_new)
-                    logger.info(f"File deduplication for source {source_id}: removed {file_dedup_result.duplicates_removed} duplicates")
-                    
-                    # Map DataFrame columns to DashboardData model
-                    column_mapping = {
-                        'Reporting day': 'reporting_day',
-                        'Production Order No.': 'production_order_no',
-                        'Customer': 'customer',
-                        'Category': 'category',
-                        'Product': 'product',
-                        'Status': 'status',
-                        'Current status': 'current_status',
-                        'Currrent status': 'current_status', # Handle typo
-                        'Production No': 'production_no',
-                        'Root cause': 'root_cause',
-                        'Improvement plan': 'improvement_plan'
-                    }
-
-                    # Prepare data for insertion
-                    # FIX: Use vectorized operations instead of slow iterrows()
-                    db_data = []
-                    
-                    from datetime import datetime
-                    # Convert entire DataFrame to dict records at once (much faster)
-                    records = df_new.to_dict('records')
-                    
-                    for row in records:
-                        record = {'source_id': source_id}
-                        for csv_col, db_col in column_mapping.items():
-                            if csv_col in row:
-                                val = row[csv_col]
-                                if pd.isna(val):
-                                    val = None
-                                elif db_col == 'reporting_day' and val:
-                                    # Convert string to date
-                                    try:
-                                        val = datetime.strptime(str(val)[:10], '%Y-%m-%d').date()
-                                    except (ValueError, TypeError):
-                                        val = None
-                                elif db_col == 'production_no':
-                                    # Ensure integer
-                                    try:
-                                        val = int(float(val)) if val else 0
-                                    except (ValueError, TypeError):
-                                        val = 0
-                                elif db_col == 'production_order_no':
-                                    # Ensure string (some Excel files have numeric values)
-                                    val = str(val).strip() if val else None
-                                record[db_col] = val
-                        db_data.append(record)
-                    
-                    if db_data:
-                        # Chunked insert to avoid packet size issues if file is large
-                        chunk_size = 1000
-                        for i in range(0, len(db_data), chunk_size):
-                            await db.execute(insert(DashboardData), db_data[i:i + chunk_size])
-                        
-                        # Commit after all chunks
-                        await db.commit()
-                        logger.info(f"Successfully inserted {len(db_data)} records for source {source_id}")
-                        
-                        # Step 2: Deduplicate against existing data from other sources
-                        db_dedup_result = await DeduplicationService.deduplicate_against_existing(db, source_id)
-                        logger.info(f"DB deduplication for source {source_id}: removed {db_dedup_result.duplicates_removed} duplicates across all sources")
-
-                # ---------------------------------------------
-                
-                schema = SchemaDetector.detect_schema(df_new)
-                validation = DataValidator.validate(df_new)
-                
-                # Update source info - wrapped in transaction
-                source.row_count = validation["row_count"]
-                source.column_count = validation["column_count"]
-                source.columns_meta = schema
-                source.status = "ready"
-                await db.commit()
-                logger.info(f"Source {source_id} processed successfully: {source.row_count} rows")
-                
-                # Clear dashboard cache
-                try:
-                    await cache_delete("dashboard:*")
-                except Exception as cache_err:
-                    logger.warning(f"Failed to clear cache: {cache_err}")
-                    
-            except Exception as e:
-                logger.error(f"Error processing file for source {source_id}: {e}", exc_info=True)
-                # Rollback transaction on error
-                await db.rollback()
-                source.status = "error"
-                source.error_message = str(e)
-                await db.commit()
-                
-                # Clean up file on error
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        logger.info(f"Cleaned up file after error: {file_path}")
-                    except OSError as rm_err:
-                        logger.warning(f"Failed to remove file {file_path}: {rm_err}")
-            
-        except Exception as e:
-            # Fatal error
-            logger.error(f"Fatal error in background upload task for source {source_id}: {e}", exc_info=True)
 
 @router.post("/upload", response_model=DataSourceResponse)
 async def upload(
@@ -176,6 +43,7 @@ async def upload(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    """Upload a new data source file"""
     # Check file extension
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ['.csv', '.xlsx', '.xls', '.json']:
@@ -187,7 +55,6 @@ async def upload(
     # SECURITY: Validate MIME type
     mime = magic.from_buffer(content, mime=True)
 
-    # Define allowed MIME types per extension
     allowed_mimes = {
         '.csv': ['text/csv', 'text/plain', 'application/csv'],
         '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
@@ -195,7 +62,6 @@ async def upload(
         '.json': ['application/json', 'text/plain'],
     }
 
-    # Validate MIME type matches extension
     if mime not in allowed_mimes.get(ext, []):
         logger.warning(f"MIME type mismatch: file={file.filename}, ext={ext}, mime={mime}")
         raise HTTPException(400, f"Invalid file type. Expected {ext} but got {mime}")
@@ -222,7 +88,8 @@ async def upload(
     
     return source
 
-@router.get("")
+
+@router.get("", response_model=DataSourceListResponse)
 async def list_sources(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -230,16 +97,14 @@ async def list_sources(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    # Build base query
+    """List data sources for current user"""
     query = select(DataSource).where(DataSource.user_id == user.id)
     if search:
         query = query.where(DataSource.name.ilike(f"%{search}%"))
     
-    # Fix N+1: Use proper COUNT query instead of loading all records
     count_query = select(func.count()).select_from(query.subquery())
     total = await db.scalar(count_query) or 0
     
-    # Fetch paginated data
     query = query.order_by(DataSource.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     sources = result.scalars().all()
@@ -253,11 +118,11 @@ async def list_sources(
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
-
 # ============ SINGLE DATA SOURCE ROUTES ============
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=DataSourceResponse)
 async def get_source(id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Get a single data source"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
@@ -268,8 +133,10 @@ async def get_source(id: int, db: AsyncSession = Depends(get_db), user: User = D
         "status": source.status, "created_at": source.created_at.isoformat() if source.created_at else None
     }
 
-@router.get("/{id}/preview")
+
+@router.get("/{id}/preview", response_model=PreviewResponse)
 async def preview(id: int, rows: int = Query(100, ge=1, le=500), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Preview data source contents"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
@@ -277,15 +144,13 @@ async def preview(id: int, rows: int = Query(100, ge=1, le=500), db: AsyncSessio
     if not os.path.exists(source.file_path):
         raise HTTPException(404, "File not found on server")
     
-    # For dashboard data, read from DB (after deduplication) instead of raw file
+    # For dashboard data, read from DB instead of raw file
     if source.data_type == "dashboard":
-        # Get actual row count from DB
         db_count_result = await db.execute(
             select(func.count()).select_from(DashboardData).where(DashboardData.source_id == id)
         )
         db_row_count = db_count_result.scalar() or 0
         
-        # Get preview data from DB
         db_result = await db.execute(
             select(DashboardData)
             .where(DashboardData.source_id == id)
@@ -294,7 +159,6 @@ async def preview(id: int, rows: int = Query(100, ge=1, le=500), db: AsyncSessio
         )
         db_rows = db_result.scalars().all()
         
-        # Convert to dict format matching original columns
         preview_data = []
         for row in db_rows:
             preview_data.append({
@@ -314,34 +178,31 @@ async def preview(id: int, rows: int = Query(100, ge=1, le=500), db: AsyncSessio
         return {
             "columns": source.columns_meta, 
             "data": preview_data, 
-            "total_rows": db_row_count,  # Use DB count (after dedup)
+            "total_rows": db_row_count,
             "preview_rows": min(rows, db_row_count)
         }
     
-    # For non-dashboard data, read from file as before
+    # For non-dashboard data, read from file
     df = FileParser.parse(source.file_path)
     preview_df = df.head(rows).fillna("")
     return {"columns": source.columns_meta, "data": preview_df.to_dict(orient="records"), "total_rows": source.row_count, "preview_rows": min(rows, source.row_count or 0)}
 
-@router.get("/{id}/data")
+
+@router.get("/{id}/data", response_model=DataResponse)
 async def get_data(
     id: int, page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500),
     sort_by: str = Query(None), sort_order: str = Query("asc"), search: str = Query(None),
     db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
+    """Get paginated data from source"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
         raise HTTPException(404, "Not found")
     
-    # For dashboard data, read from DB (after deduplication)
     if source.data_type == "dashboard":
-        from sqlalchemy import asc as sql_asc, desc as sql_desc
-        
-        # Build query
         query = select(DashboardData).where(DashboardData.source_id == id)
         
-        # Search filter
         if search:
             search_filter = or_(
                 DashboardData.customer.ilike(f"%{search}%"),
@@ -353,11 +214,9 @@ async def get_data(
             )
             query = query.where(search_filter)
         
-        # Count total
         count_query = select(func.count()).select_from(query.subquery())
         total = await db.scalar(count_query) or 0
         
-        # Sorting
         sort_column_map = {
             "Reporting day": DashboardData.reporting_day,
             "Customer": DashboardData.customer,
@@ -373,14 +232,12 @@ async def get_data(
         else:
             query = query.order_by(sql_desc(DashboardData.reporting_day))
         
-        # Pagination
         start = (page - 1) * page_size
         query = query.offset(start).limit(page_size)
         
         db_result = await db.execute(query)
         db_rows = db_result.scalars().all()
         
-        # Convert to dict format
         data = []
         for row in db_rows:
             data.append({
@@ -405,7 +262,7 @@ async def get_data(
             "total_pages": (total + page_size - 1) // page_size
         }
     
-    # For non-dashboard data, read from file as before
+    # For non-dashboard data, read from file
     if not os.path.exists(source.file_path):
         raise HTTPException(404, "File not found")
     
@@ -423,8 +280,10 @@ async def get_data(
     
     return {"columns": source.columns_meta, "data": page_df.to_dict(orient="records"), "total": total, "page": page, "page_size": page_size, "total_pages": (total + page_size - 1) // page_size}
 
-@router.get("/{id}/validate")
+
+@router.get("/{id}/validate", response_model=ValidationResponse)
 async def validate_source(id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Validate data source"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
@@ -434,8 +293,10 @@ async def validate_source(id: int, db: AsyncSession = Depends(get_db), user: Use
     df = FileParser.parse(source.file_path)
     return DataValidator.validate(df)
 
-@router.get("/{id}/schema")
+
+@router.get("/{id}/schema", response_model=SchemaResponse)
 async def detect_schema(id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Detect schema for data source"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
@@ -445,8 +306,10 @@ async def detect_schema(id: int, db: AsyncSession = Depends(get_db), user: User 
     df = FileParser.parse(source.file_path)
     return {"schema": SchemaDetector.detect_schema(df)}
 
-@router.post("/{id}/process")
+
+@router.post("/{id}/process", response_model=ProcessResponse)
 async def process_source(id: int, name: str = Query(None), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Mark source as processed"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
@@ -458,8 +321,10 @@ async def process_source(id: int, name: str = Query(None), db: AsyncSession = De
     await db.refresh(source)
     return {"id": source.id, "name": source.name, "columns": source.columns_meta, "row_count": source.row_count, "status": source.status, "created_at": source.created_at.isoformat() if source.created_at else None}
 
-@router.delete("/{id}")
+
+@router.delete("/{id}", response_model=DeleteResponse)
 async def delete_source(id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Delete a data source"""
     result = await db.execute(select(DataSource).where(DataSource.id == id, DataSource.user_id == user.id))
     source = result.scalar_one_or_none()
     if not source:
@@ -472,7 +337,6 @@ async def delete_source(id: int, db: AsyncSession = Depends(get_db), user: User 
     if data_type == "dashboard":
         await db.execute(delete(DashboardData).where(DashboardData.source_id == id))
     
-    # Then delete data_source
     await db.delete(source)
     await db.commit()
     
