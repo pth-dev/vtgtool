@@ -82,13 +82,15 @@ export default function DashboardPage() {
   } = useDashboard()
 
   // Decomposition Tree data (Single mode)
-  const { data: decompositionData } = useQuery<{ data: TreemapItem | null }>({
+  const { data: decompositionData } = useQuery<TreemapItem | null>({
     queryKey: ['dashboard-decomposition', selectedMonth],
     queryFn: async () => {
       const params = new URLSearchParams()
       if (selectedMonth) params.set('month', selectedMonth)
       const res = await fetch(`/api/dashboard/decomposition?${params}`)
-      return res.json()
+      const json = await res.json()
+      // API returns {data: TreemapItem}, extract the data field
+      return json.data || null
     },
     enabled: !!selectedMonth && mode === 'single',
   })
@@ -234,7 +236,7 @@ export default function DashboardPage() {
               <EditableChartsGrid
                 charts={data.charts}
                 rootCauses={data.root_causes || []}
-                treemapData={decompositionData?.data || null}
+                treemapData={decompositionData || null}
                 crossFilter={crossFilter}
                 onCrossFilter={toggleCrossFilter}
                 onShowData={handleShowData}

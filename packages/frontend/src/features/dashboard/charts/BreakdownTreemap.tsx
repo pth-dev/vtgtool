@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Box, Chip, Stack, Typography } from '@mui/material'
 import { EChartsTreemap } from './EChartsTreemap'
 
@@ -24,15 +24,33 @@ const levelLabels: Record<DrillLevel, string> = {
 
 export function BreakdownTreemap({ data, height }: Props) {
   const [drillPath, setDrillPath] = useState<{ level: DrillLevel; value: string }[]>([])
+  const dataIdRef = useRef<string | null>(null)
+
+  // Reset drillPath when data ID changes (not just reference)
+  useEffect(() => {
+    const currentDataId = data ? `${data.name}-${data.value}` : null
+    if (currentDataId !== dataIdRef.current) {
+      dataIdRef.current = currentDataId
+      if (drillPath.length > 0) {
+        setDrillPath([])
+      }
+    }
+  }, [data, drillPath.length])
 
   const currentData = useMemo(() => {
     if (!data) return []
     let current: TreemapItem[] = data.children || []
 
+    // Navigate through drill path
     for (const { value } of drillPath) {
       const found = current.find((c) => c.name === value)
-      if (found?.children) current = found.children
-      else break
+      if (found?.children) {
+        current = found.children
+      } else {
+        // Path not found, return root level
+        current = data.children || []
+        break
+      }
     }
 
     return current.map((item) => ({
@@ -79,7 +97,11 @@ export function BreakdownTreemap({ data, height }: Props) {
       </Stack>
       <Box sx={{ height }}>
         {currentData.length > 0 ? (
-          <EChartsTreemap data={currentData} height={height} onItemClick={handleItemClick} />
+          <EChartsTreemap 
+            data={currentData} 
+            height={height} 
+            onItemClick={handleItemClick} 
+          />
         ) : (
           <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography color="text.secondary">No data</Typography>

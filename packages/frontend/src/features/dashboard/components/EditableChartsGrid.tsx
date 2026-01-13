@@ -301,7 +301,7 @@ export function EditableChartsGrid({
           )}
         </Box>
       )),
-    [chartConfigs, charts, crossFilter, isEditMode, editingTitle, theme.palette.primary.main]
+    [chartConfigs, charts, rootCauses, treemapData, crossFilter, isEditMode, editingTitle, theme.palette.primary.main]
   )
 
   if (isLoading || !containerWidth) {

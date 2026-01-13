@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, Grid, Typography } from '@mui/material'
 import { RootCauseBarChart } from './RootCauseBarChart'
 import { RootCauseTable } from './RootCauseTable'
@@ -21,12 +21,12 @@ interface Props {
 
 export function RootCauseAnalysis({ rootCauses, treemapData, isMobile = false }: Props) {
   const [selectedBar, setSelectedBar] = useState<string | null>(null)
-  const top10 = useMemo(() => rootCauses.slice(0, 10), [rootCauses])
-
-  const filteredRootCauses = useMemo(() => {
-    if (!selectedBar) return rootCauses.slice(0, 10)
-    return rootCauses.filter((rc) => rc.root_cause === selectedBar).slice(0, 10)
-  }, [rootCauses, selectedBar])
+  
+  // Simple operations - no need for useMemo
+  const top10 = rootCauses.slice(0, 10)
+  const filteredRootCauses = !selectedBar 
+    ? rootCauses.slice(0, 10)
+    : rootCauses.filter((rc) => rc.root_cause === selectedBar).slice(0, 10)
 
   const handleBarSelect = (name: string) => {
     setSelectedBar(selectedBar === name ? null : name)
@@ -51,7 +51,10 @@ export function RootCauseAnalysis({ rootCauses, treemapData, isMobile = false }:
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <BreakdownTreemap data={treemapData} height={isMobile ? 250 : 320} />
+            <BreakdownTreemap 
+              data={treemapData} 
+              height={isMobile ? 250 : 320} 
+            />
           </Grid>
 
           <Grid size={12}>

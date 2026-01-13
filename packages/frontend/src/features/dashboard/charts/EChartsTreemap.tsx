@@ -29,6 +29,11 @@ export function EChartsTreemap({ data, height, onItemClick }: Props) {
   const isDark = theme.palette.mode === 'dark'
 
   const option = useMemo(() => ({
+    // Animation configuration
+    animation: true,
+    animationDuration: 800,
+    animationEasing: 'cubicOut',
+    animationDelay: 0,
     tooltip: {
       formatter: (info: { name: string; value: number; data: TreemapItem }) => {
         return `<div style="padding:4px 8px;">
@@ -53,26 +58,43 @@ export function EChartsTreemap({ data, height, onItemClick }: Props) {
         breadcrumb: { show: false },
         label: {
           show: true,
-          formatter: (params: { data: TreemapItem }) => {
-            const name = params.data.x
-            const displayName = name.length > 40 ? name.slice(0, 40) + '...' : name
-            return `${displayName}\n${params.data.percent}%`
+          formatter: (params: any) => {
+            const percent = params.data?.percent || 0
+            const name = params.data?.x || params.name
+            const displayName = name && name.length > 15 ? name.slice(0, 13) + '...' : name
+            return `${displayName}\n${percent}%`
           },
-          fontSize: 13,
-          fontWeight: 600,
+          fontSize: 20,
+          fontWeight: 800,
           color: '#fff',
-          textShadowColor: 'rgba(0,0,0,0.5)',
-          textShadowBlur: 2,
+          lineHeight: 28,
+          textBorderColor: 'rgba(0,0,0,0.3)',
+          textBorderWidth: 1,
           align: 'center',
           verticalAlign: 'middle',
-          overflow: 'truncate',
-          ellipsis: '...',
         },
         upperLabel: { show: false },
         itemStyle: {
-          borderColor: isDark ? '#222' : '#fff',
-          borderWidth: 2,
-          gapWidth: 2,
+          borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.95)',
+          borderWidth: 4,
+          borderRadius: 12,
+          gapWidth: 6,
+          shadowColor: 'rgba(0,0,0,0.2)',
+          shadowBlur: 8,
+          shadowOffsetY: 3,
+        },
+        emphasis: {
+          itemStyle: {
+            borderColor: '#fff',
+            borderWidth: 5,
+            shadowColor: 'rgba(0,0,0,0.4)',
+            shadowBlur: 16,
+            shadowOffsetY: 6,
+          },
+          label: {
+            fontSize: 24,
+            fontWeight: 900,
+          },
         },
         data: data.map((item, i) => ({
           name: item.x,
@@ -100,10 +122,11 @@ export function EChartsTreemap({ data, height, onItemClick }: Props) {
     <ReactEChartsCore
       echarts={echarts}
       option={option}
-      style={{ height, width: '100%' }}
+      style={{ height, width: '100%', transition: 'all 0.3s ease' }}
       onEvents={onEvents}
-      notMerge
-      lazyUpdate
+      notMerge={false}
+      lazyUpdate={false}
+      opts={{ renderer: 'canvas' }}
     />
   )
 }
