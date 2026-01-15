@@ -196,3 +196,27 @@ export const MULTI_FILTERS: MultiFilterConfig[] = [
   { key: 'statuses', label: 'Status' },
   { key: 'products', label: 'Product' },
 ]
+
+// Chat Types
+export type ChatRole = 'user' | 'assistant'
+
+export interface ChatMessage {
+  id: string
+  role: ChatRole
+  content: string
+  timestamp: Date
+}
+
+export interface ChatState {
+  messages: ChatMessage[]
+  isOpen: boolean
+  isLoading: boolean
+  sessionId: string | null
+}
+
+export interface ChatResponse {
+  response: string
+  session_id: string
+  model_used: string
+  timestamp: string
+}

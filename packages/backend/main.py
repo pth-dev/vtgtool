@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.api import auth, config, isc
+from app.api import auth, config, isc, chat
 from app.api.dashboard import router as dashboard_router
 from app.api.datasources import router as datasources_router
 from app.core.config import settings
@@ -77,6 +77,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(datasources_router, prefix="/api/datasources", tags=["Data Sources"])
 app.include_router(config.router, prefix="/api", tags=["Config"])
 app.include_router(isc.router, prefix="/api/isc", tags=["ISC DO System"])
+app.include_router(chat.router, prefix="/api/chat", tags=["AI Chat"])
 
 @app.get("/health", tags=["System"])
 async def health():

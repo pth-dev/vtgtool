@@ -57,6 +57,10 @@ export type {
   MobileFilterBarProps,
   MobileFilterDrawerProps,
   DesktopFilterPanelProps,
+  ChatRole,
+  ChatMessage,
+  ChatState,
+  ChatResponse,
 } from './ui.types'
 
 // Constants

@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
     ENVIRONMENT: str = "development"  # development, staging, production
     
+    # Gemini AI Configuration
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL_PRIMARY: str = "gemini-2.5-pro"  # Best model for reasoning (2025-2026)
+    GEMINI_MODEL_FALLBACK: str = "gemini-2.5-flash"  # Fast fallback if rate limited
+    
     class Config:
         env_file = ".env"
     

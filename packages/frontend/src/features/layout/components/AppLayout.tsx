@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from 'react'
 import { Box, Drawer, useMediaQuery, useTheme } from '@mui/material'
 
 import { LAYOUT } from '@/constants'
+import { ChatFloatingButton } from '@/features/chat'
 
 import { MainContent } from './MainContent'
 import { MobileHeader } from './MobileHeader'
@@ -71,6 +72,9 @@ export default function AppLayout({ children }: Props) {
       )}
 
       <MainContent isMobile={isMobile}>{children}</MainContent>
+      
+      {/* AI Chat Floating Button */}
+      <ChatFloatingButton />
     </Box>
   )
 }

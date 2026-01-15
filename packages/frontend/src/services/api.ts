@@ -261,4 +261,20 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     }),
+
+  // AI Chat
+  sendChatMessage: (message: string, includeDashboardContext = true, sessionId?: string) =>
+    request<{ response: string; session_id: string; model_used: string }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        include_dashboard_context: includeDashboardContext,
+        session_id: sessionId,
+      }),
+    }),
+  clearChatHistory: (sessionId?: string) =>
+    request<{ success: boolean; message: string }>(
+      `/chat/history${sessionId ? `?session_id=${sessionId}` : ''}`,
+      { method: 'DELETE' }
+    ),
 }
