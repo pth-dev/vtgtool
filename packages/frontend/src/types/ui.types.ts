@@ -115,3 +115,84 @@ export interface FilterOptions {
   statuses: string[]
   products: string[]
 }
+
+export type FilterKey = keyof FilterState
+export type MultiFilterKey = Exclude<FilterKey, 'month'>
+export type FilterChangeHandler = (key: FilterKey, value: string | string[]) => void
+
+export interface MultiFilterConfig {
+  key: MultiFilterKey
+  label: string
+}
+
+export interface MonthRange {
+  minDate?: import('dayjs').Dayjs
+  maxDate?: import('dayjs').Dayjs
+}
+
+export interface FilterPanelProps {
+  filters: FilterState
+  options: FilterOptions
+  selectedMonth: string
+  onChange: FilterChangeHandler
+  onClear: () => void
+}
+
+export interface MonthPickerProps {
+  value: import('dayjs').Dayjs | null
+  range: MonthRange
+  isDark: boolean
+  isMobile: boolean
+  isDisabled: boolean
+  onChange: (value: import('dayjs').Dayjs | null) => void
+}
+
+export interface FilterSelectorsProps {
+  filters: FilterState
+  options: FilterOptions
+  isDark: boolean
+  isMobile: boolean
+  onChange: FilterChangeHandler
+}
+
+export interface ActiveFilterChipsProps {
+  filters: FilterState
+  onChange: FilterChangeHandler
+}
+
+export interface MobileFilterBarProps {
+  monthPicker: React.ReactNode
+  activeCount: number
+  isDark: boolean
+  onOpen: () => void
+}
+
+export interface MobileFilterDrawerProps {
+  open: boolean
+  isDark: boolean
+  activeCount: number
+  filters: FilterState
+  options: FilterOptions
+  onChange: FilterChangeHandler
+  onClear: () => void
+  onClose: () => void
+}
+
+export interface DesktopFilterPanelProps {
+  monthPicker: React.ReactNode
+  activeCount: number
+  isDark: boolean
+  filters: FilterState
+  options: FilterOptions
+  onChange: FilterChangeHandler
+  onClear: () => void
+}
+
+export const MONTH_FORMAT = 'YYYY-MM'
+
+export const MULTI_FILTERS: MultiFilterConfig[] = [
+  { key: 'customers', label: 'Customer' },
+  { key: 'categories', label: 'Category' },
+  { key: 'statuses', label: 'Status' },
+  { key: 'products', label: 'Product' },
+]

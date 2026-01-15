@@ -1,7 +1,7 @@
 export { TanStackTable } from './TanStackTable'
 export { default as PageLoader } from './PageLoader'
 export { default as FormDialog } from './FormDialog'
-export { default as FilterPanel } from './FilterPanel'
+export { FilterPanel } from '@/shared/components/filter'
 export { default as KpiCard } from './KpiCard'
 export { default as PageHeader } from './PageHeader'
 export { default as NotFound } from './NotFound'

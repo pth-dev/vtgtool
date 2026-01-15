@@ -45,4 +45,19 @@ export type {
   ThemeColors,
   FilterState,
   FilterOptions,
+  FilterKey,
+  MultiFilterKey,
+  FilterChangeHandler,
+  MultiFilterConfig,
+  MonthRange,
+  FilterPanelProps,
+  MonthPickerProps,
+  FilterSelectorsProps,
+  ActiveFilterChipsProps,
+  MobileFilterBarProps,
+  MobileFilterDrawerProps,
+  DesktopFilterPanelProps,
 } from './ui.types'
+
+// Constants
+export { MONTH_FORMAT, MULTI_FILTERS } from './ui.types'

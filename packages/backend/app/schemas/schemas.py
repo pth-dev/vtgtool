@@ -1,18 +1,37 @@
-from pydantic import BaseModel, EmailStr, field_validator, Field
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional, Any
 from datetime import datetime
 import re
 
+# Email validation pattern to allow local domains like .local
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def validate_email(value: str) -> str:
+    if not EMAIL_PATTERN.match(value):
+        raise ValueError("Must be a valid email address")
+    return value
+
 # Auth
 class LoginRequest(BaseModel):
-    email: EmailStr  # Auto-validates email format
+    email: str = Field(..., min_length=3, max_length=320)
     password: str = Field(..., min_length=1)
 
+    @field_validator('email')
+    @classmethod
+    def validate_email_field(cls, value: str) -> str:
+        return validate_email(value)
+
 class RegisterRequest(BaseModel):
-    email: EmailStr  # Auto-validates email format
+    email: str = Field(..., min_length=3, max_length=320)
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = Field(None, max_length=200)
     role: str = Field("viewer", pattern="^(admin|editor|viewer)$")
+
+    @field_validator('email')
+    @classmethod
+    def validate_email_field(cls, value: str) -> str:
+        return validate_email(value)
 
     @field_validator('password')
     @classmethod

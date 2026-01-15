@@ -72,11 +72,11 @@ app.add_middleware(
     max_age=3600,
 )
 
-app.include_router(dashboard_router, prefix="/api/dashboard", tags=["📊 Dashboard"])
-app.include_router(auth.router, prefix="/api/auth", tags=["🔐 Authentication"])
-app.include_router(datasources_router, prefix="/api/datasources", tags=["📁 Data Sources"])
-app.include_router(config.router, prefix="/api", tags=["⚙️ Config"])
-app.include_router(isc.router, prefix="/api/isc", tags=["🔍 ISC DO System"])
+app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(datasources_router, prefix="/api/datasources", tags=["Data Sources"])
+app.include_router(config.router, prefix="/api", tags=["Config"])
+app.include_router(isc.router, prefix="/api/isc", tags=["ISC DO System"])
 
 @app.get("/health", tags=["System"])
 async def health():

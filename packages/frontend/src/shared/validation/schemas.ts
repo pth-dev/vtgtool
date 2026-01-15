@@ -5,7 +5,8 @@
 import { z } from 'zod'
 
 // Common field validations
-const email = z.string().min(1, 'Email is required').email('Please enter a valid email address')
+const emailPattern: RegExp = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const email: z.ZodString = z.string().min(1, 'Email is required').regex(emailPattern, 'Must be a valid email address')
 
 const password = z
   .string()
