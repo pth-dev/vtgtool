@@ -2,7 +2,7 @@
 Chat API Schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -12,6 +12,14 @@ class ChatRequest(BaseModel):
     include_dashboard_context: bool = Field(
         default=True,
         description="Include current dashboard data in AI context"
+    )
+    month: Optional[str] = Field(
+        default=None,
+        description="Month to analyze in YYYY-MM format (e.g., '2025-09'). If not provided, uses latest month."
+    )
+    compare_months: Optional[List[str]] = Field(
+        default=None,
+        description="List of months to compare (e.g., ['2025-09', '2025-10', '2025-11'])"
     )
     session_id: Optional[str] = Field(
         default=None,

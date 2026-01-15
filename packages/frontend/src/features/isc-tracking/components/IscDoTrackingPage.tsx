@@ -85,7 +85,7 @@ export default function IscDoTrackingPage() {
 
       <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         {/* Input Form */}
-        <Box sx={{ flex: '1 1 400px', minWidth: 300 }}>
+        <Box sx={{ flex: '1 1 400px', minWidth: 300 }} data-tour-id="isc-input-form">
           <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -169,7 +169,7 @@ export default function IscDoTrackingPage() {
         </Box>
 
         {/* Result Panel */}
-        <Box sx={{ flex: '1 1 400px', minWidth: 300 }}>
+        <Box sx={{ flex: '1 1 400px', minWidth: 300 }} data-tour-id="isc-result-panel">
           <Card
             elevation={0}
             sx={{

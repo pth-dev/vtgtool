@@ -19,6 +19,7 @@ export function ChatFloatingButton(): JSX.Element {
     <>
       <Zoom in>
         <Fab
+          data-tour-id="chat-button"
           color="primary"
           onClick={toggleChat}
           sx={{

@@ -23,10 +23,10 @@ interface Props {
 
 export function KpiSection({ kpis, momChange, isMobile = false }: Props) {
   const items = useMemo<KpiConfig[]>(() => [
-    { key: 'total', title: 'Total Orders', value: kpis.total_orders, color: '#3b82f6' },
-    { key: 'lock', title: 'Lock', value: kpis.lock_count || 0, color: '#8b5cf6' },
-    { key: 'hold', title: 'Hold', value: kpis.hold_count || 0, color: '#f59e0b' },
-    { key: 'failure', title: 'Failure', value: kpis.failure_count || 0, color: '#ef4444' },
+    { key: 'total', title: 'Total Orders', value: kpis.total_orders, color: '#3b82f6', tourId: 'kpi-total' },
+    { key: 'lock', title: 'Lock', value: kpis.lock_count || 0, color: '#8b5cf6', tourId: 'kpi-lock' },
+    { key: 'hold', title: 'Hold', value: kpis.hold_count || 0, color: '#f59e0b', tourId: 'kpi-hold' },
+    { key: 'failure', title: 'Failure', value: kpis.failure_count || 0, color: '#ef4444', tourId: 'kpi-failed' },
     { 
       key: 'resume', 
       title: 'Resume Success', 
@@ -35,6 +35,7 @@ export function KpiSection({ kpis, momChange, isMobile = false }: Props) {
       color: '#10b981',
       change: momChange?.resume_success_rate,
       changeType: 'points',
+      tourId: 'kpi-resume',
     },
     { 
       key: 'rate', 
@@ -45,6 +46,7 @@ export function KpiSection({ kpis, momChange, isMobile = false }: Props) {
       change: momChange?.failure_rate,
       changeType: 'points',
       invertColor: true,
+      tourId: 'kpi-rate',
     },
   ], [kpis, momChange])
 

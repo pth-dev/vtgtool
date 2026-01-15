@@ -5,6 +5,7 @@ import { Box, Button, Typography } from '@mui/material'
 import { ErrorOutline, Refresh } from '@mui/icons-material'
 
 import { GlobalConfirmDialog } from '@/shared/components/ui/GlobalConfirmDialog'
+import { TourProvider } from '@/features/tour/components/TourProvider'
 import NotFound from '@/shared/components/ui/NotFound'
 
 interface RouterContext {
@@ -42,11 +43,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootComponent() {
   return (
-    <Box sx={{ minHeight: '100vh' }}>
-      <Outlet />
-      <GlobalConfirmDialog />
-      {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-right" />}
-    </Box>
+    <TourProvider>
+      <Box sx={{ minHeight: '100vh' }}>
+        <Outlet />
+        <GlobalConfirmDialog />
+        {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-right" />}
+      </Box>
+    </TourProvider>
   )
 }
 

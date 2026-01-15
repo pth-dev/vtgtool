@@ -1,17 +1,19 @@
 /**
  * Chat Header Component
- * Header with title, close and clear buttons
+ * Header with title, close, clear, and expand buttons
  */
 import { Box, IconButton, Typography, Tooltip, useTheme } from '@mui/material'
-import { Close, DeleteOutline, SmartToy } from '@mui/icons-material'
+import { Close, DeleteOutline, SmartToy, OpenInFull, CloseFullscreen } from '@mui/icons-material'
 
 interface Props {
   onClose: () => void
   onClear: () => void
   hasMessages: boolean
+  isExpanded: boolean
+  onToggleExpand: () => void
 }
 
-export function ChatHeader({ onClose, onClear, hasMessages }: Props): JSX.Element {
+export function ChatHeader({ onClose, onClear, hasMessages, isExpanded, onToggleExpand }: Props): JSX.Element {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
   
@@ -50,6 +52,16 @@ export function ChatHeader({ onClose, onClear, hasMessages }: Props): JSX.Elemen
             </IconButton>
           </Tooltip>
         )}
+        <Tooltip title={isExpanded ? "Shrink" : "Expand"}>
+          <IconButton
+            data-tour-id="chat-expand-button"
+            size="small"
+            onClick={onToggleExpand}
+            sx={{ color: isDark ? '#9ca3af' : 'rgba(255,255,255,0.8)' }}
+          >
+            {isExpanded ? <CloseFullscreen fontSize="small" /> : <OpenInFull fontSize="small" />}
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Close">
           <IconButton
             size="small"

@@ -12,6 +12,7 @@ export function MonthPicker({ value, range, isDark, isMobile, isDisabled, onChan
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <DatePicker
+        data-tour-id="month-filter"
         views={['year', 'month']}
         openTo="month"
         format={MONTH_FORMAT}

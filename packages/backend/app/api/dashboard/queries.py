@@ -81,17 +81,19 @@ async def calculate_metrics(db: AsyncSession, filters: dict) -> dict:
         canceled = row.cancel_prod or 0
 
     resume_success_rate = round((total - canceled) / total * 100, 1) if total else 0
+    lock_rate = round(lock / total * 100, 1) if total else 0
     hold_rate = round(hold / total * 100, 1) if total else 0
     failure_rate = round(canceled / total * 100, 1) if total else 0
 
     return {
         "total_orders": int(total),
         "lock_count": int(lock),
+        "lock_rate": lock_rate,
         "hold_count": int(hold),
-        "failure_count": int(failure),
-        "resume_success_rate": resume_success_rate,
         "hold_rate": hold_rate,
+        "failure_count": int(failure),
         "failure_rate": failure_rate,
+        "resume_success_rate": resume_success_rate,
     }
 
 

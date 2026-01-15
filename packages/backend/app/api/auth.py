@@ -31,6 +31,24 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
+
+async def get_current_user_optional(request: Request, db: AsyncSession = Depends(get_db)) -> User | None:
+    """Get current user if authenticated, otherwise return None (for optional auth)."""
+    token = request.cookies.get("auth_token")
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+    except JWTError:
+        return None
+    
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    user = result.scalar_one_or_none()
+    return user
+
 @router.post("/login")
 @limiter.limit("5/minute")  # Max 5 login attempts per minute per IP
 async def login(request: Request, data: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):

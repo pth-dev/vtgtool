@@ -2,7 +2,7 @@
  * Chat Popup Component
  * Main chat popup container with messages and input
  */
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { Box, Paper, Typography, useTheme } from '@mui/material'
 import { SmartToy } from '@mui/icons-material'
 
@@ -13,10 +13,17 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { TypingIndicator } from './TypingIndicator'
 
+// Size configurations
+const SIZES = {
+  normal: { width: 380, height: 520 },
+  expanded: { width: 600, height: 700 },
+}
+
 export function ChatPopup(): JSX.Element {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
   
   const {
     messages,
@@ -26,7 +33,10 @@ export function ChatPopup(): JSX.Element {
     setLoading,
     setSessionId,
     clearMessages,
+    selectedMonth,
   } = useChatStore()
+  
+  const currentSize = isExpanded ? SIZES.expanded : SIZES.normal
   
   function scrollToBottom(): void {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -41,7 +51,8 @@ export function ChatPopup(): JSX.Element {
     setLoading(true)
     
     try {
-      const response = await api.sendChatMessage(content, true)
+      // Send message with current selected month from dashboard
+      const response = await api.sendChatMessage(content, true, undefined, selectedMonth || undefined)
       setSessionId(response.session_id)
       addMessage({ role: 'assistant', content: response.response })
     } catch (error) {
@@ -66,25 +77,31 @@ export function ChatPopup(): JSX.Element {
   
   return (
     <Paper
+      data-tour-id="chat-popup"
       elevation={8}
       sx={{
         position: 'fixed',
-        bottom: 88,
+        bottom: isExpanded ? 20 : 88,
         right: 16,
-        width: 380,
-        height: 520,
+        width: currentSize.width,
+        height: currentSize.height,
+        maxWidth: 'calc(100vw - 32px)',
+        maxHeight: 'calc(100vh - 100px)',
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 3,
         overflow: 'hidden',
         zIndex: 1300,
         bgcolor: isDark ? '#0f172a' : '#fff',
+        transition: 'all 0.3s ease-in-out',
       }}
     >
       <ChatHeader
         onClose={closeChat}
         onClear={handleClearHistory}
         hasMessages={messages.length > 0}
+        isExpanded={isExpanded}
+        onToggleExpand={() => setIsExpanded(!isExpanded)}
       />
       
       <Box

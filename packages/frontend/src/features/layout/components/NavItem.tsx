@@ -16,12 +16,13 @@ interface NavItemProps {
   label: string
   collapsed: boolean
   onClick?: () => void
+  tourId?: string
 }
 
 /**
  * Navigation item component for sidebar
  */
-export function NavItem({ to, icon, label, collapsed, onClick }: NavItemProps) {
+export function NavItem({ to, icon, label, collapsed, onClick, tourId }: NavItemProps) {
   const { isDark } = useThemeMode()
   const matchRoute = useMatchRoute()
 
@@ -30,6 +31,7 @@ export function NavItem({ to, icon, label, collapsed, onClick }: NavItemProps) {
 
   return (
     <ListItemButton
+      data-tour-id={tourId || `nav-${to.replace(/\//g, '-')}`}
       component={Link}
       to={to}
       onClick={onClick}

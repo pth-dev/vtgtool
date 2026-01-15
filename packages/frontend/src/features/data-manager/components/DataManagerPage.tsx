@@ -30,16 +30,16 @@ export default function DataManagerPage() {
       <PageHeader
         title="Data Sources"
         action={
-          <Button variant="contained" startIcon={<Add />} onClick={dm.openImportDialog}>
+          <Button variant="contained" startIcon={<Add />} onClick={dm.openImportDialog} data-tour-id="import-data-button">
             Import Data
           </Button>
         }
       />
 
-      <Card>
+      <Card data-tour-id="data-sources-content">
         <CardContent>
           {/* Search */}
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2 }} data-tour-id="data-sources-search">
             <TextField
               fullWidth
               size="small"
@@ -57,6 +57,7 @@ export default function DataManagerPage() {
           </Box>
 
           {/* Table */}
+          <Box data-tour-id="data-sources-table">
           <DatasetTable
             datasets={dm.datasets}
             totalCount={dm.totalCount}
@@ -69,6 +70,7 @@ export default function DataManagerPage() {
             onDelete={handleDelete}
             onImport={dm.openImportDialog}
           />
+          </Box>
         </CardContent>
       </Card>
 

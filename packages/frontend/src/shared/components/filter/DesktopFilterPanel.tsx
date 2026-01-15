@@ -19,6 +19,7 @@ export function DesktopFilterPanel({
 }: DesktopFilterPanelProps): JSX.Element {
   return (
     <Paper
+      data-tour-id="filter-panel"
       elevation={0}
       sx={{
         p: 2,

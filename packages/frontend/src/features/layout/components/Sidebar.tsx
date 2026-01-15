@@ -4,6 +4,7 @@ import { Box, Button, Divider, List } from '@mui/material'
 
 import { getSidebarItems } from '@/config/navigation'
 import { useAuthStore } from '@/features/auth'
+import { TourLauncher } from '@/features/tour'
 import { ThemeToggle } from '@/shared/components/ui/ThemeToggle'
 
 import { AnimatedLogo } from './AnimatedLogo'
@@ -32,7 +33,7 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, useAnimatedLogo
   }
 
   return (
-    <>
+    <Box data-tour-id="sidebar" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box
         sx={{
@@ -63,24 +64,32 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, useAnimatedLogo
 
       {/* Navigation */}
       <List sx={{ flex: 1, px: 1, py: 2 }}>
-        {sidebarItems.map((item) => (
-          <NavItem
-            key={item.path}
-            to={item.path}
-            icon={item.icon}
-            label={item.label}
-            collapsed={collapsed}
-            onClick={onNavClick}
-          />
-        ))}
+        {sidebarItems.map((item) => {
+          // Generate friendly tour IDs
+          const tourId = item.path === '/' 
+            ? 'nav-dashboard' 
+            : `nav-${item.path.split('/').pop()}`
+          return (
+            <NavItem
+              key={item.path}
+              to={item.path}
+              icon={item.icon}
+              label={item.label}
+              collapsed={collapsed}
+              onClick={onNavClick}
+              tourId={tourId}
+            />
+          )
+        })}
       </List>
 
       <Divider />
 
       {/* Footer */}
       <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, gap: 1 }}>
           <ThemeToggle />
+          <TourLauncher collapsed={collapsed} variant="icon" />
         </Box>
         {user ? (
           <Button
@@ -105,6 +114,6 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, useAnimatedLogo
           </Button>
         )}
       </Box>
-    </>
+    </Box>
   )
 }

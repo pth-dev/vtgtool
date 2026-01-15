@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense, useEffect } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
 
@@ -7,6 +7,7 @@ import { Box, Stack, Typography, useMediaQuery, useTheme } from '@mui/material'
 import { DashboardSkeleton, FilterPanel, PageHeader } from '@/shared/components/ui'
 import { useDashboard } from '@/hooks'
 import { type TreemapItem } from '@/features/dashboard/charts'
+import { useChatStore } from '@/features/chat/chatStore'
 
 import { AlertBanner } from './AlertBanner'
 import { CompareKpiSection } from './CompareKpiSection'
@@ -66,6 +67,7 @@ export default function DashboardPage() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [mode, setMode] = useState<DashboardMode>('single')
+  const setSelectedMonthForChat = useChatStore((state) => state.setSelectedMonth)
 
   const {
     data,
@@ -80,6 +82,13 @@ export default function DashboardPage() {
     updateFilter,
     clearFilters,
   } = useDashboard()
+
+  // Sync selectedMonth to chat store whenever it changes
+  useEffect(() => {
+    if (selectedMonth) {
+      setSelectedMonthForChat(selectedMonth)
+    }
+  }, [selectedMonth, setSelectedMonthForChat])
 
   // Decomposition Tree data (Single mode)
   const { data: decompositionData } = useQuery<TreemapItem | null>({

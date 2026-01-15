@@ -33,6 +33,7 @@ export function ChatInput({ onSend, disabled = false }: Props): JSX.Element {
   
   return (
     <Box
+      data-tour-id="chat-input"
       sx={{
         display: 'flex',
         gap: 1,

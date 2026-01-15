@@ -240,7 +240,7 @@ export function EditableChartsGrid({
   const gridChildren = useMemo(
     () =>
       chartConfigs.map((config) => (
-        <Box key={config.i} sx={{ height: '100%' }}>
+        <Box key={config.i} sx={{ height: '100%' }} data-tour-id={`chart-${config.dataKey}`}>
           {config.type === 'rootcause' ? (
             // RootCauseAnalysis has its own Card, just add edit controls
             <Box sx={{ height: '100%', position: 'relative' }}>
@@ -313,7 +313,7 @@ export function EditableChartsGrid({
   }
 
   return (
-    <Box ref={containerRef} sx={{ position: 'relative', mb: 3 }}>
+    <Box ref={containerRef} sx={{ position: 'relative', mb: 3 }} data-tour-id="charts-grid">
       {/* Edit Controls */}
       {isAdmin && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>

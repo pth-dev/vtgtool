@@ -263,13 +263,21 @@ export const api = {
     }),
 
   // AI Chat
-  sendChatMessage: (message: string, includeDashboardContext = true, sessionId?: string) =>
+  sendChatMessage: (
+    message: string, 
+    includeDashboardContext = true, 
+    sessionId?: string,
+    month?: string,
+    compareMonths?: string[]
+  ) =>
     request<{ response: string; session_id: string; model_used: string }>('/chat', {
       method: 'POST',
       body: JSON.stringify({
         message,
         include_dashboard_context: includeDashboardContext,
         session_id: sessionId,
+        month: month,
+        compare_months: compareMonths,
       }),
     }),
   clearChatHistory: (sessionId?: string) =>

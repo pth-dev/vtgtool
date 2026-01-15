@@ -12,6 +12,7 @@ interface ChatStore {
   isOpen: boolean
   isLoading: boolean
   sessionId: string | null
+  selectedMonth: string | null  // Track current month from dashboard
   
   // Actions
   openChat: () => void
@@ -20,6 +21,7 @@ interface ChatStore {
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
   setLoading: (loading: boolean) => void
   setSessionId: (sessionId: string) => void
+  setSelectedMonth: (month: string | null) => void
   clearMessages: () => void
 }
 
@@ -34,6 +36,7 @@ export const useChatStore = create<ChatStore>()(
       isOpen: false,
       isLoading: false,
       sessionId: null,
+      selectedMonth: null,
       
       openChat: () => set({ isOpen: true }),
       
@@ -57,6 +60,8 @@ export const useChatStore = create<ChatStore>()(
       
       setSessionId: (sessionId) => set({ sessionId }),
       
+      setSelectedMonth: (selectedMonth) => set({ selectedMonth }),
+      
       clearMessages: () => set({ messages: [], sessionId: null }),
     }),
     {
@@ -64,6 +69,7 @@ export const useChatStore = create<ChatStore>()(
       partialize: (state) => ({
         messages: state.messages.slice(-50), // Keep last 50 messages
         sessionId: state.sessionId,
+        selectedMonth: state.selectedMonth,
       }),
     }
   )
